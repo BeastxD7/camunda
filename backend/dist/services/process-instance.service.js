@@ -1,0 +1,191 @@
+import { operateClient } from "../clients/camunda.client.js";
+function normalizeSearchAfter(values) {
+    return values.map((value) => {
+        if (value && typeof value === "object" && "value" in value) {
+            return value.value;
+        }
+        return value;
+    });
+}
+async function listProcessInstances(pageSize = 100) {
+    const all = [];
+    let searchAfter;
+    while (true) {
+        const response = await operateClient.searchProcessInstances({
+            size: pageSize,
+            sort: [{ field: "key", order: "ASC" }],
+            ...(searchAfter ? { searchAfter } : {}),
+        });
+        if (!response.items.length) {
+            break;
+        }
+        all.push(...response.items);
+        if (!response.sortValues || response.sortValues.length === 0) {
+            break;
+        }
+        searchAfter = normalizeSearchAfter(response.sortValues);
+    }
+    return all;
+}
+async function listProcessVariables(processInstanceKey, pageSize = 1000) {
+    const all = [];
+    let searchAfter;
+    while (true) {
+        const response = await operateClient.getVariablesforProcess(processInstanceKey, {
+            size: pageSize,
+            sort: [{ field: "key", order: "ASC" }],
+            ...(searchAfter ? { searchAfter } : {}),
+        });
+        if (!response.items.length) {
+            break;
+        }
+        all.push(...response.items);
+        if (!response.sortValues || response.sortValues.length === 0) {
+            break;
+        }
+        searchAfter = normalizeSearchAfter(response.sortValues);
+    }
+    return all;
+}
+function parseJsonValue(value) {
+    if (typeof value !== "string")
+        return value;
+    const trimmed = value.trim();
+    if (!trimmed)
+        return value;
+    const maybeJsonLike = trimmed.startsWith("{") ||
+        trimmed.startsWith("[") ||
+        trimmed.startsWith('"{') ||
+        trimmed.startsWith('"[');
+    if (!maybeJsonLike) {
+        return value;
+    }
+    const parseAttempt = (input) => {
+        try {
+            return JSON.parse(input);
+        }
+        catch {
+            return undefined;
+        }
+    };
+    let parsed = parseAttempt(trimmed);
+    // Handle double-encoded payloads such as "{\"a\":1}".
+    if (typeof parsed === "string") {
+        const nested = parseAttempt(parsed);
+        if (nested !== undefined) {
+            parsed = nested;
+        }
+    }
+    if (parsed !== undefined) {
+        return parsed;
+    }
+    // Best-effort recovery for truncated JSON strings returned by Operate.
+    const repaired = repairTruncatedJson(trimmed);
+    const repairedParsed = parseAttempt(repaired);
+    if (repairedParsed !== undefined) {
+        return repairedParsed;
+    }
+    return value;
+}
+function repairTruncatedJson(input) {
+    let out = input;
+    const stack = [];
+    let inString = false;
+    let escaped = false;
+    for (const char of input) {
+        if (escaped) {
+            escaped = false;
+            continue;
+        }
+        if (char === "\\") {
+            escaped = true;
+            continue;
+        }
+        if (char === '"') {
+            inString = !inString;
+            continue;
+        }
+        if (inString) {
+            continue;
+        }
+        if (char === "{" || char === "[") {
+            stack.push(char);
+            continue;
+        }
+        if (char === "}" && stack[stack.length - 1] === "{") {
+            stack.pop();
+            continue;
+        }
+        if (char === "]" && stack[stack.length - 1] === "[") {
+            stack.pop();
+        }
+    }
+    if (inString) {
+        out += '"';
+    }
+    for (let i = stack.length - 1; i >= 0; i -= 1) {
+        out += stack[i] === "{" ? "}" : "]";
+    }
+    return out;
+}
+function normalizeVariables(items) {
+    return items.map((item) => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) {
+            return item;
+        }
+        const variable = item;
+        if (!("value" in variable)) {
+            return variable;
+        }
+        return {
+            ...variable,
+            value: parseJsonValue(variable.value),
+        };
+    });
+}
+async function hydrateTruncatedVariables(items) {
+    return Promise.all(items.map(async (item) => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) {
+            return item;
+        }
+        const variable = item;
+        if (variable.truncated !== true || typeof variable.key !== "number" && typeof variable.key !== "string") {
+            return item;
+        }
+        try {
+            const fullVariable = await operateClient.getVariables(variable.key);
+            return {
+                ...fullVariable,
+                value: parseJsonValue(fullVariable.value),
+            };
+        }
+        catch {
+            return {
+                ...variable,
+                value: parseJsonValue(variable.value),
+            };
+        }
+    }));
+}
+async function getProcessInstanceDetails(instanceKey) {
+    const instance = await operateClient.getProcessInstance(instanceKey);
+    const flownodes = await operateClient.searchFlownodeInstances({
+        filter: { processInstanceKey: instanceKey },
+        size: 500,
+    });
+    let variables = [];
+    try {
+        const vars = await listProcessVariables(instanceKey);
+        variables = await hydrateTruncatedVariables(normalizeVariables(vars));
+    }
+    catch {
+        variables = [];
+    }
+    return {
+        instance,
+        flowNodes: flownodes.items,
+        variables,
+    };
+}
+export { listProcessInstances, getProcessInstanceDetails };
+//# sourceMappingURL=process-instance.service.js.map
