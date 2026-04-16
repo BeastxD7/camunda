@@ -1,11 +1,11 @@
 import { apiError, apiSuccess } from "../utils/api-response.js";
-import { exportDashboardDefinitions, getDashboardIds, getReportIds, } from "../services/optimize.service.js";
+import { disableSharing, enableSharing, exportDashboardDefinitions, getDashboardIds, getReportIds, getReportData, } from "../services/optimize.service.js";
 function parseCollectionId(input) {
     if (typeof input !== "string") {
         return undefined;
     }
-    const value = Number(input);
-    if (!Number.isInteger(value) || value < 0) {
+    const value = input.trim();
+    if (!value) {
         return undefined;
     }
     return value;
@@ -15,7 +15,7 @@ async function getOptimizeDashboardIdsController(req, res, next) {
         const collectionId = parseCollectionId(req.query.collectionId);
         if (collectionId === undefined) {
             return apiError(res, 400, "Invalid request", {
-                collectionId: "collectionId query param must be a non-negative integer",
+                collectionId: "collectionId query param is required and must be a non-empty string",
             });
         }
         const data = await getDashboardIds(collectionId);
@@ -30,7 +30,7 @@ async function getOptimizeReportIdsController(req, res, next) {
         const collectionId = parseCollectionId(req.query.collectionId);
         if (collectionId === undefined) {
             return apiError(res, 400, "Invalid request", {
-                collectionId: "collectionId query param must be a non-negative integer",
+                collectionId: "collectionId query param is required and must be a non-empty string",
             });
         }
         const data = await getReportIds(collectionId);
@@ -55,5 +55,38 @@ async function exportOptimizeDashboardDefinitionsController(req, res, next) {
         next(error);
     }
 }
-export { getOptimizeDashboardIdsController, getOptimizeReportIdsController, exportOptimizeDashboardDefinitionsController, };
+async function enableOptimizeSharingController(req, res, next) {
+    try {
+        await enableSharing();
+        return apiSuccess(res, 200, "Optimize sharing enabled successfully");
+    }
+    catch (error) {
+        next(error);
+    }
+}
+async function disableOptimizeSharingController(req, res, next) {
+    try {
+        await disableSharing();
+        return apiSuccess(res, 200, "Optimize sharing disabled successfully");
+    }
+    catch (error) {
+        next(error);
+    }
+}
+async function getOptimizeReportDataController(req, res, next) {
+    try {
+        const reportId = parseCollectionId(req.query.reportId);
+        if (reportId === undefined) {
+            return apiError(res, 400, "Invalid request", {
+                reportId: "reportId query param is required and must be a non-empty string",
+            });
+        }
+        const data = await getReportData(reportId);
+        return apiSuccess(res, 200, "Optimize report data fetched successfully", data);
+    }
+    catch (error) {
+        next(error);
+    }
+}
+export { enableOptimizeSharingController, disableOptimizeSharingController, getOptimizeDashboardIdsController, getOptimizeReportIdsController, exportOptimizeDashboardDefinitionsController, getOptimizeReportDataController, };
 //# sourceMappingURL=optimize.controller.js.map

@@ -7,6 +7,9 @@ function notFoundHandler(req, res, _next) {
 }
 function errorHandler(err, _req, res, _next) {
     const upstreamStatus = getUpstreamStatus(err);
+    const message = err instanceof Error ? err.message : "Unexpected server error";
+    const target = getUpstreamTarget(err);
+    const isOptimizeTarget = typeof target === "string" && target.includes("optimize.camunda.io");
     if (upstreamStatus === 503) {
         return apiError(res, 503, "Camunda Operate is temporarily unavailable", {
             code: "CAMUNDA_OPERATE_UNAVAILABLE",
@@ -21,11 +24,19 @@ function errorHandler(err, _req, res, _next) {
             target: err.url,
         });
     }
-    const message = err instanceof Error ? err.message : "Unexpected server error";
+    if ((upstreamStatus === 401 || upstreamStatus === 403) && isOptimizeTarget) {
+        return apiError(res, upstreamStatus, message, {
+            code: "CAMUNDA_OPTIMIZE_AUTH_ERROR",
+            upstreamStatus,
+            target,
+            hint: "Optimize authentication failed. Verify client has Optimize API permission and CAMUNDA_OPTIMIZE_OAUTH_AUDIENCE=optimize.camunda.io.",
+        });
+    }
     if (upstreamStatus && upstreamStatus >= 400 && upstreamStatus <= 599) {
         return apiError(res, upstreamStatus, message, {
-            code: "CAMUNDA_OPERATE_ERROR",
+            code: "CAMUNDA_UPSTREAM_ERROR",
             upstreamStatus,
+            target,
         });
     }
     return apiError(res, 500, message, {
@@ -37,21 +48,47 @@ function getUpstreamStatus(err) {
         return undefined;
     }
     const candidate = err;
-    if (typeof candidate.status === "number") {
+    const isHttpStatus = (value) => typeof value === "number" && Number.isInteger(value) && value >= 100 && value <= 599;
+    if (isHttpStatus(candidate.response?.status)) {
+        return candidate.response.status;
+    }
+    if (isHttpStatus(candidate.response?.statusCode)) {
+        return candidate.response.statusCode;
+    }
+    if (isHttpStatus(candidate.status)) {
         return candidate.status;
     }
-    if (typeof candidate.statusCode === "number") {
+    if (isHttpStatus(candidate.statusCode)) {
         return candidate.statusCode;
-    }
-    if (typeof candidate.response?.status === "number") {
-        return candidate.response.status;
     }
     const message = typeof candidate.message === "string" ? candidate.message : "";
     const statusFromMessage = message.match(/Response code\s+(\d{3})/i)?.[1];
     if (statusFromMessage) {
         return Number(statusFromMessage);
     }
+    const fromSource = getUpstreamStatus(candidate.source);
+    if (fromSource !== undefined) {
+        return fromSource;
+    }
+    const fromCause = getUpstreamStatus(candidate.cause);
+    if (fromCause !== undefined) {
+        return fromCause;
+    }
     return undefined;
+}
+function getUpstreamTarget(err) {
+    if (!err || typeof err !== "object") {
+        return undefined;
+    }
+    const candidate = err;
+    if (typeof candidate.url === "string") {
+        return candidate.url;
+    }
+    const fromSource = getUpstreamTarget(candidate.source);
+    if (fromSource) {
+        return fromSource;
+    }
+    return getUpstreamTarget(candidate.cause);
 }
 function isConnectionRefusedError(err) {
     if (!err || typeof err !== "object") {

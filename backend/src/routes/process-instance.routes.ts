@@ -23,6 +23,12 @@ const processInstanceRoutes = Router();
  *           default: 100
  *         required: false
  *         description: Page size used per Operate fetch cycle.
+ *       - in: query
+ *         name: bpmnProcessId
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: Filter to one BPMN process definition ID.
  *     responses:
  *       200:
  *         description: Process instances fetched successfully.

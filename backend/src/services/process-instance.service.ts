@@ -12,12 +12,19 @@ function normalizeSearchAfter(values: unknown[]): unknown[] {
 	});
 }
 
-async function listProcessInstances(pageSize = 100) {
+async function listProcessInstances(pageSize = 100, bpmnProcessId?: string) {
 	const all = [];
 	let searchAfter: unknown[] | undefined;
+	const normalizedBpmnProcessId =
+		typeof bpmnProcessId === "string" && bpmnProcessId.trim().length > 0
+			? bpmnProcessId.trim()
+			: undefined;
 
 	while (true) {
 		const response = await operateClient.searchProcessInstances({
+			...(normalizedBpmnProcessId
+				? { filter: { bpmnProcessId: normalizedBpmnProcessId } }
+				: {}),
 			size: pageSize,
 			sort: [{ field: "key", order: "ASC" }],
 			...(searchAfter ? { searchAfter } : {}),
@@ -184,6 +191,73 @@ function normalizeVariables(items: unknown[]): unknown[] {
 	});
 }
 
+function extractNormalizedData(variables: unknown[]) {
+	const findVar = (name: string) => {
+		return variables.find((item) => {
+			if (!item || typeof item !== "object") return false;
+			const variable = item as UnknownRecord;
+			return String(variable.name || "") === name;
+		});
+	};
+
+	// Look for already-normalized data or construct from raw
+	const normalizedVar = findVar("normalized");
+	if (normalizedVar && typeof normalizedVar === "object") {
+		const parsed = (normalizedVar as UnknownRecord).value;
+		if (parsed && typeof parsed === "object") {
+			return parsed;
+		}
+	}
+
+	// Fallback: extract conversation from variables
+	const agentContextVar = findVar("agentContext");
+	let conversation: UnknownRecord | null = null;
+
+	if (agentContextVar && typeof agentContextVar === "object") {
+		const agentValue = (agentContextVar as UnknownRecord).value;
+		if (agentValue && typeof agentValue === "object") {
+			const agentObj = agentValue as UnknownRecord;
+			conversation = (agentObj.conversation || agentObj.messages) as UnknownRecord | null;
+		}
+	}
+
+	// If no agentContext, look for conversation or messages variable directly
+	if (!conversation) {
+		const conversationVar = findVar("conversation") || findVar("messages");
+		if (conversationVar && typeof conversationVar === "object") {
+			const value = (conversationVar as UnknownRecord).value;
+			if (Array.isArray(value) || (value && typeof value === "object")) {
+				conversation = value as UnknownRecord;
+			}
+		}
+	}
+
+	// Build normalized structure
+	let messages: unknown[] = [];
+	if (conversation && typeof conversation === "object") {
+		if (Array.isArray(conversation)) {
+			messages = conversation;
+		} else if ("messages" in conversation && Array.isArray(conversation.messages)) {
+			messages = conversation.messages;
+		}
+	}
+
+	return {
+		conversationData: {
+			type: "support",
+			conversationId: "",
+			messageCount: messages.length,
+			roleCounts: {
+				system: 0,
+				user: 0,
+				assistant: 0,
+				tool: 0,
+			},
+			messages: messages,
+		},
+	};
+}
+
 async function hydrateTruncatedVariables(items: unknown[]): Promise<unknown[]> {
 	return Promise.all(
 		items.map(async (item) => {
@@ -232,10 +306,14 @@ async function getProcessInstanceDetails(instanceKey: string) {
 		variables = [];
 	}
 
+	// Extract conversation data from variables
+	const normalizedData = extractNormalizedData(variables);
+
 	return {
 		instance,
 		flowNodes: flownodes.items,
 		variables,
+		normalized: normalizedData,
 	};
 }
 

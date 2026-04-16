@@ -12,12 +12,17 @@ async function listProcessInstancesController(
 ) {
 	try {
 		const sizeParam = req.query.size;
+		const bpmnProcessIdParam = req.query.bpmnProcessId;
 		const size =
 			typeof sizeParam === "string" && Number.isFinite(Number(sizeParam))
 				? Number(sizeParam)
 				: 100;
+		const bpmnProcessId =
+			typeof bpmnProcessIdParam === "string" && bpmnProcessIdParam.trim().length > 0
+				? bpmnProcessIdParam.trim()
+				: undefined;
 
-		const items = await listProcessInstances(size);
+		const items = await listProcessInstances(size, bpmnProcessId);
 
 		return apiSuccess(res, 200, "Process instances fetched successfully", {
 			count: items.length,

@@ -1,0 +1,293 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource/montserrat/500.css";
+@import "@fontsource/montserrat/600.css";
+@import "@fontsource/montserrat/700.css";
+@import "@fontsource/pt-serif/400.css";
+@import "@fontsource/pt-serif/700.css";
+@import "@fontsource/roboto/400.css";
+@import "@fontsource/roboto/500.css";
+@import "@fontsource/roboto/700.css";
+@import "@fontsource/roboto/900.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-logo: "Montserrat", sans-serif;
+  --font-heading: "Roboto", sans-serif;
+  --font-sans: "PT Serif", serif;
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #191919;
+  --card: #ffffff;
+  --card-foreground: #191919;
+  --popover: #ffffff;
+  --popover-foreground: #191919;
+  --primary: #f46524;
+  --primary-foreground: #ffffff;
+  --secondary: #e8e8e8;
+  --secondary-foreground: #191919;
+  --muted: #e8e8e8;
+  --muted-foreground: #757575;
+  --accent: #fab292;
+  --accent-foreground: #191919;
+  --destructive: #c3511d;
+  --border: #e8e8e8;
+  --input: #e8e8e8;
+  --ring: #f46524;
+  --chart-1: #f46524;
+  --chart-2: #c3511d;
+  --chart-3: #fab292;
+  --chart-4: #757575;
+  --chart-5: #474747;
+  --radius: 1rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #191919;
+  --sidebar-primary: #f46524;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #fab292;
+  --sidebar-accent-foreground: #191919;
+  --sidebar-border: #e8e8e8;
+  --sidebar-ring: #f46524;
+}
+
+.dark {
+  --background: #191919;
+  --foreground: #feebdd;
+  --card: #242424;
+  --card-foreground: #feebdd;
+  --popover: #242424;
+  --popover-foreground: #feebdd;
+  --primary: #f46524;
+  --primary-foreground: #191919;
+  --secondary: #474747;
+  --secondary-foreground: #feebdd;
+  --muted: #303030;
+  --muted-foreground: #a3a3a3;
+  --accent: #c3511d;
+  --accent-foreground: #feebdd;
+  --destructive: #fab292;
+  --border: #474747;
+  --input: #474747;
+  --ring: #f46524;
+  --chart-1: #f46524;
+  --chart-2: #fab292;
+  --chart-3: #c3511d;
+  --chart-4: #a3a3a3;
+  --chart-5: #e8e8e8;
+  --sidebar: #222222;
+  --sidebar-foreground: #feebdd;
+  --sidebar-primary: #f46524;
+  --sidebar-primary-foreground: #191919;
+  --sidebar-accent: #c3511d;
+  --sidebar-accent-foreground: #feebdd;
+  --sidebar-border: #474747;
+  --sidebar-ring: #f46524;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    background-image: none;
+    font-family: var(--font-sans);
+  }
+
+  .dark body {
+    background-image: none;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.02em;
+  }
+
+  .font-logo {
+    font-family: var(--font-logo);
+  }
+
+  html {
+    @apply font-sans;
+  }
+}
+
+@layer utilities {
+  .support-shell {
+    background: linear-gradient(180deg, color-mix(in oklch, var(--background) 96%, white) 0%, var(--background) 100%);
+  }
+
+  .dark .support-shell {
+    background: linear-gradient(180deg, color-mix(in oklch, var(--background) 94%, black) 0%, var(--background) 100%);
+  }
+
+  .support-header,
+  .support-card {
+    backdrop-filter: blur(10px);
+    background: color-mix(in srgb, var(--card) 94%, transparent);
+    box-shadow:
+      0 1px 0 color-mix(in srgb, #ffffff 75%, transparent) inset,
+      0 16px 30px -24px color-mix(in srgb, var(--foreground) 24%, transparent);
+  }
+
+  .dark .support-header,
+  .dark .support-card {
+    background: color-mix(in srgb, var(--card) 92%, transparent);
+    box-shadow:
+      0 1px 0 color-mix(in srgb, #000000 35%, transparent) inset,
+      0 22px 38px -24px color-mix(in srgb, #000000 72%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--foreground) 8%, transparent);
+  }
+
+  .brand-metric-card {
+    border: 1px solid var(--border);
+    background: var(--card);
+    box-shadow: none;
+  }
+
+  .dark .brand-metric-card {
+    border-color: var(--border);
+    background: var(--card);
+    box-shadow: none;
+  }
+
+  .support-header {
+    animation: rise-fade 500ms ease both;
+  }
+
+  .support-card {
+    animation: rise-fade 580ms ease both;
+  }
+
+  /* New animations for multi-page routing */
+  .animate-fade-in {
+    animation: fade-in 600ms ease both;
+  }
+
+  .animate-slide-up {
+    animation: slide-up 500ms ease both;
+  }
+
+  .animate-slide-down {
+    animation: slide-down 500ms ease both;
+  }
+
+  .animate-slide-left {
+    animation: slide-left 500ms ease both;
+  }
+
+  .animate-slide-right {
+    animation: slide-right 500ms ease both;
+  }
+
+  @keyframes rise-fade {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slide-down {
+    from {
+      opacity: 0;
+      transform: translateY(-12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slide-left {
+    from {
+      opacity: 0;
+      transform: translateX(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes slide-right {
+    from {
+      opacity: 0;
+      transform: translateX(-16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+}

@@ -344,12 +344,12 @@ Retrieves all Optimize dashboard IDs for a given collection.
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| collectionId | number | Yes | Optimize collection ID |
+| collectionId | string | Yes | Optimize collection ID |
 
 ### Request Example
 
 ```http
-GET /api/optimize/dashboard-ids?collectionId=123 HTTP/1.1
+GET /api/optimize/dashboard-ids?collectionId=40cb3657-bdcb-459d-93ce-06877ac7244a HTTP/1.1
 Host: localhost:3000
 Accept: application/json
 ```
@@ -377,7 +377,7 @@ Accept: application/json
   "success": false,
   "message": "Invalid request",
   "error": {
-    "collectionId": "collectionId query param must be a non-negative integer"
+    "collectionId": "collectionId query param is required and must be a non-empty string"
   }
 }
 ```
@@ -399,12 +399,12 @@ Retrieves all Optimize report IDs for a given collection.
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| collectionId | number | Yes | Optimize collection ID |
+| collectionId | string | Yes | Optimize collection ID |
 
 ### Request Example
 
 ```http
-GET /api/optimize/report-ids?collectionId=123 HTTP/1.1
+GET /api/optimize/report-ids?collectionId=40cb3657-bdcb-459d-93ce-06877ac7244a HTTP/1.1
 Host: localhost:3000
 Accept: application/json
 ```
@@ -432,7 +432,7 @@ Accept: application/json
   "success": false,
   "message": "Invalid request",
   "error": {
-    "collectionId": "collectionId query param must be a non-negative integer"
+    "collectionId": "collectionId query param is required and must be a non-empty string"
   }
 }
 ```
@@ -493,7 +493,67 @@ Exports dashboard definitions (including associated reports) for one or more das
 
 ---
 
-## 5.7 Unknown Route (Global 404 Handler)
+## 5.7 Enable Optimize Sharing
+
+### Endpoint
+
+- Method: `POST`
+- Path: `/api/optimize/sharing/enable`
+
+### Description
+
+Enables Optimize sharing globally for dashboards and reports.
+
+### Request
+
+- Query params: none
+- Path params: none
+- Body: none
+
+### Success Response
+
+- Status: `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Optimize sharing enabled successfully"
+}
+```
+
+---
+
+## 5.8 Disable Optimize Sharing
+
+### Endpoint
+
+- Method: `POST`
+- Path: `/api/optimize/sharing/disable`
+
+### Description
+
+Disables Optimize sharing globally for dashboards and reports.
+
+### Request
+
+- Query params: none
+- Path params: none
+- Body: none
+
+### Success Response
+
+- Status: `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Optimize sharing disabled successfully"
+}
+```
+
+---
+
+## 5.9 Unknown Route (Global 404 Handler)
 
 ### Example
 
@@ -549,13 +609,13 @@ curl -s "http://localhost:3000/api/process-instances/2251799813685249"
 ### 7.4 Get Optimize dashboard IDs
 
 ```bash
-curl -s "http://localhost:3000/api/optimize/dashboard-ids?collectionId=123"
+curl -s "http://localhost:3000/api/optimize/dashboard-ids?collectionId=40cb3657-bdcb-459d-93ce-06877ac7244a"
 ```
 
 ### 7.5 Get Optimize report IDs
 
 ```bash
-curl -s "http://localhost:3000/api/optimize/report-ids?collectionId=123"
+curl -s "http://localhost:3000/api/optimize/report-ids?collectionId=40cb3657-bdcb-459d-93ce-06877ac7244a"
 ```
 
 ### 7.6 Export Optimize dashboard definitions
@@ -564,6 +624,18 @@ curl -s "http://localhost:3000/api/optimize/report-ids?collectionId=123"
 curl -s -X POST "http://localhost:3000/api/optimize/dashboard-definitions/export" \
   -H "Content-Type: application/json" \
   -d '{"dashboardIds":["8a7103a7-c086-48f8-b5b7-a7f83e864688"]}'
+```
+
+### 7.7 Enable Optimize sharing
+
+```bash
+curl -s -X POST "http://localhost:3000/api/optimize/sharing/enable"
+```
+
+### 7.8 Disable Optimize sharing
+
+```bash
+curl -s -X POST "http://localhost:3000/api/optimize/sharing/disable"
 ```
 
 ## 8. OpenAPI and Swagger UI

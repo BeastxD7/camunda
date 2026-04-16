@@ -7,11 +7,17 @@ function normalizeSearchAfter(values) {
         return value;
     });
 }
-async function listProcessInstances(pageSize = 100) {
+async function listProcessInstances(pageSize = 100, bpmnProcessId) {
     const all = [];
     let searchAfter;
+    const normalizedBpmnProcessId = typeof bpmnProcessId === "string" && bpmnProcessId.trim().length > 0
+        ? bpmnProcessId.trim()
+        : undefined;
     while (true) {
         const response = await operateClient.searchProcessInstances({
+            ...(normalizedBpmnProcessId
+                ? { filter: { bpmnProcessId: normalizedBpmnProcessId } }
+                : {}),
             size: pageSize,
             sort: [{ field: "key", order: "ASC" }],
             ...(searchAfter ? { searchAfter } : {}),
@@ -143,6 +149,68 @@ function normalizeVariables(items) {
         };
     });
 }
+function extractNormalizedData(variables) {
+    const findVar = (name) => {
+        return variables.find((item) => {
+            if (!item || typeof item !== "object")
+                return false;
+            const variable = item;
+            return String(variable.name || "") === name;
+        });
+    };
+    // Look for already-normalized data or construct from raw
+    const normalizedVar = findVar("normalized");
+    if (normalizedVar && typeof normalizedVar === "object") {
+        const parsed = normalizedVar.value;
+        if (parsed && typeof parsed === "object") {
+            return parsed;
+        }
+    }
+    // Fallback: extract conversation from variables
+    const agentContextVar = findVar("agentContext");
+    let conversation = null;
+    if (agentContextVar && typeof agentContextVar === "object") {
+        const agentValue = agentContextVar.value;
+        if (agentValue && typeof agentValue === "object") {
+            const agentObj = agentValue;
+            conversation = (agentObj.conversation || agentObj.messages);
+        }
+    }
+    // If no agentContext, look for conversation or messages variable directly
+    if (!conversation) {
+        const conversationVar = findVar("conversation") || findVar("messages");
+        if (conversationVar && typeof conversationVar === "object") {
+            const value = conversationVar.value;
+            if (Array.isArray(value) || (value && typeof value === "object")) {
+                conversation = value;
+            }
+        }
+    }
+    // Build normalized structure
+    let messages = [];
+    if (conversation && typeof conversation === "object") {
+        if (Array.isArray(conversation)) {
+            messages = conversation;
+        }
+        else if ("messages" in conversation && Array.isArray(conversation.messages)) {
+            messages = conversation.messages;
+        }
+    }
+    return {
+        conversationData: {
+            type: "support",
+            conversationId: "",
+            messageCount: messages.length,
+            roleCounts: {
+                system: 0,
+                user: 0,
+                assistant: 0,
+                tool: 0,
+            },
+            messages: messages,
+        },
+    };
+}
 async function hydrateTruncatedVariables(items) {
     return Promise.all(items.map(async (item) => {
         if (!item || typeof item !== "object" || Array.isArray(item)) {
@@ -181,10 +249,13 @@ async function getProcessInstanceDetails(instanceKey) {
     catch {
         variables = [];
     }
+    // Extract conversation data from variables
+    const normalizedData = extractNormalizedData(variables);
     return {
         instance,
         flowNodes: flownodes.items,
         variables,
+        normalized: normalizedData,
     };
 }
 export { listProcessInstances, getProcessInstanceDetails };

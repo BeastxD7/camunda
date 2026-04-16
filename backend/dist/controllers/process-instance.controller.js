@@ -3,10 +3,14 @@ import { apiError, apiSuccess } from "../utils/api-response.js";
 async function listProcessInstancesController(req, res, next) {
     try {
         const sizeParam = req.query.size;
+        const bpmnProcessIdParam = req.query.bpmnProcessId;
         const size = typeof sizeParam === "string" && Number.isFinite(Number(sizeParam))
             ? Number(sizeParam)
             : 100;
-        const items = await listProcessInstances(size);
+        const bpmnProcessId = typeof bpmnProcessIdParam === "string" && bpmnProcessIdParam.trim().length > 0
+            ? bpmnProcessIdParam.trim()
+            : undefined;
+        const items = await listProcessInstances(size, bpmnProcessId);
         return apiSuccess(res, 200, "Process instances fetched successfully", {
             count: items.length,
             items,
