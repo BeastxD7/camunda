@@ -33,14 +33,14 @@ export const Navigation: React.FC = () => {
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5 rounded-lg blur-md" />
               <span className="relative inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg ring-2 ring-primary/25">
-                <span className="font-bold text-sm">E</span>
+                <span className="font-bold text-sm">B</span>
               </span>
             </div>
 
             {/* Brand Text */}
             <div className="flex flex-col">
               <span className="block font-bold text-lg leading-none text-foreground">
-                EZ Support
+                Bank Support
               </span>
               <span className="block text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground/70">
                 Smart Case Management
