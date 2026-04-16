@@ -1,0 +1,26 @@
+services:
+  postgres:
+    build:
+      context: ./postgres
+      args:
+        POSTGRES_DB: camunda_demo
+        POSTGRES_USER: camunda
+        POSTGRES_PASSWORD: camunda
+    container_name: camunda-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: camunda_demo
+      POSTGRES_USER: camunda
+      POSTGRES_PASSWORD: camunda
+    ports:
+      - "5432:5432"
+    volumes:
+      - camunda_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U camunda -d camunda_demo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  camunda_postgres_data:

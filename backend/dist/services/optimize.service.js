@@ -1,4 +1,6 @@
 import { optimizeClient } from "../clients/camunda.client.js";
+import { prisma } from "../lib/prisma.js";
+import { getDataSourceMode } from "./data-source.service.js";
 const optimizeClientCompat = optimizeClient;
 function getRequiredEnv(name) {
     const value = process.env[name];
@@ -38,15 +40,37 @@ async function getOptimizeAccessToken() {
     return tokenPayload.access_token;
 }
 async function enableSharing() {
+    if ((await getDataSourceMode()) === "db") {
+        return { mode: "db", enabled: true };
+    }
     return optimizeClientCompat.enableSharing();
 }
 async function disableSharing() {
+    if ((await getDataSourceMode()) === "db") {
+        return { mode: "db", enabled: false };
+    }
     return optimizeClientCompat.disableSharing();
 }
 async function getDashboardIds(collectionId) {
+    if ((await getDataSourceMode()) === "db") {
+        const rows = await prisma.optimizeDashboardSnapshot.findMany({
+            where: { collectionId },
+            select: { dashboardId: true },
+            orderBy: { updatedAt: "desc" },
+        });
+        return rows.map((row) => ({ id: row.dashboardId }));
+    }
     return optimizeClientCompat.getDashboardIds(collectionId);
 }
 async function getReportIds(collectionId) {
+    if ((await getDataSourceMode()) === "db") {
+        const rows = await prisma.optimizeReportSnapshot.findMany({
+            where: { collectionId },
+            select: { reportId: true },
+            orderBy: { updatedAt: "desc" },
+        });
+        return rows.map((row) => ({ id: row.reportId }));
+    }
     const optimizeBaseUrl = getRequiredEnv("CAMUNDA_OPTIMIZE_BASE_URL").replace(/\/$/, "");
     const token = await getOptimizeAccessToken();
     const response = await fetch(`${optimizeBaseUrl}/api/public/report?collectionId=${encodeURIComponent(collectionId)}`, {
@@ -61,6 +85,12 @@ async function getReportIds(collectionId) {
     return (await response.json());
 }
 async function exportDashboardDefinitions(dashboardIds) {
+    if ((await getDataSourceMode()) === "db") {
+        const rows = await prisma.optimizeDashboardSnapshot.findMany({
+            where: { dashboardId: { in: dashboardIds } },
+        });
+        return rows.map((row) => row.dashboardData);
+    }
     const optimizeBaseUrl = getRequiredEnv("CAMUNDA_OPTIMIZE_BASE_URL").replace(/\/$/, "");
     const token = await getOptimizeAccessToken();
     const response = await fetch(`${optimizeBaseUrl}/api/public/export/dashboard/definition/json`, {
@@ -78,6 +108,13 @@ async function exportDashboardDefinitions(dashboardIds) {
     return (await response.json());
 }
 async function getReportData(reportId) {
+    if ((await getDataSourceMode()) === "db") {
+        const row = await prisma.optimizeReportSnapshot.findUnique({ where: { sourceKey: reportId } });
+        if (!row) {
+            throw new Error(`Optimize report ${reportId} not found in demo database`);
+        }
+        return row.reportData;
+    }
     const optimizeBaseUrl = getRequiredEnv("CAMUNDA_OPTIMIZE_BASE_URL").replace(/\/$/, "");
     const token = await getOptimizeAccessToken();
     const response = await fetch(`${optimizeBaseUrl}/api/public/export/report/${encodeURIComponent(reportId)}/result/json?limit=1&paginationTimeout=60`, {

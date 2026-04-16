@@ -24,6 +24,25 @@ type ListTasklistFilters = {
 };
 declare function listTasklistTasks(filters?: ListTasklistFilters): Promise<{
     id: string;
+    name: string | null;
+    taskDefinitionId: string | null;
+    processName: string | null;
+    processInstanceKey: string | null;
+    taskState: string;
+    assignee: string | null;
+    creationDate: Date | null;
+    dueDate: Date | null;
+    followUpDate: Date | null;
+    tenantId: string | null;
+    candidateGroups: string[] | undefined;
+    candidateUsers: string[] | undefined;
+    formKey: string | null;
+    formId: string | null;
+    formVersion: string | null;
+    implementation: string | null;
+    variables: TaskVariables;
+}[] | {
+    id: string;
     name: string;
     taskDefinitionId: string;
     processName: string;

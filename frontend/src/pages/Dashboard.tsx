@@ -135,7 +135,7 @@ export const DashboardPage: React.FC = () => {
                 const reportData = reportMap.get(tile.id);
                 return {
                   id: tile.id,
-                  name: reportData?.name || 'Unknown Report',
+                  name: reportData?.name || `Report ${tile.id}`,
                 };
               });
           }
@@ -255,41 +255,43 @@ export const DashboardPage: React.FC = () => {
           />
         )}
 
-        {(supportCaseMetrics.length > 0 || metricsLoading) && (
-          <section className="border border-border/70 bg-background p-5">
-            <h2 className="text-xl font-semibold mb-4">Support Case Metrics</h2>
-            {metricsLoading ? (
-              <>
-                <MetricGridSkeleton count={4} />
-                <p className="text-xs text-muted-foreground mt-3 animate-pulse">Loading metrics...</p>
-              </>
-            ) : (
-              <>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  {supportCaseMetrics.map((metric) => {
-                    const isDuration = isDurationMetricName(metric.name)
-                    const displayValue = isDuration && typeof metric.value === 'number' 
-                      ? formatDuration(metric.value)
-                      : metric.value
-                    
-                    return (
-                      <div
-                        key={metric.id}
-                        className="brand-metric-card rounded-lg px-4 py-4 text-foreground"
-                      >
-                        <p className="text-3xl font-semibold tracking-tight">{displayValue}</p>
-                        <p className="mt-1 text-[0.68rem] uppercase tracking-[0.16em] text-foreground/70">{metric.name}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-                <p className="text-xs text-muted-foreground mt-3">
-                  Last updated: {optimizeStatsUpdatedAt ? new Date(optimizeStatsUpdatedAt).toLocaleString() : 'Loading...'}
-                </p>
-              </>
-            )}
-          </section>
-        )}
+        <section className="border border-border/70 bg-background p-5">
+          <h2 className="text-xl font-semibold mb-4">Support Case Metrics</h2>
+          {metricsLoading ? (
+            <>
+              <MetricGridSkeleton count={4} />
+              <p className="text-xs text-muted-foreground mt-3 animate-pulse">Loading metrics...</p>
+            </>
+          ) : supportCaseMetrics.length > 0 ? (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {supportCaseMetrics.map((metric) => {
+                  const isDuration = isDurationMetricName(metric.name)
+                  const displayValue = isDuration && typeof metric.value === 'number' 
+                    ? formatDuration(metric.value)
+                    : metric.value
+                  
+                  return (
+                    <div
+                      key={metric.id}
+                      className="brand-metric-card rounded-lg px-4 py-4 text-foreground"
+                    >
+                      <p className="text-3xl font-semibold tracking-tight">{displayValue}</p>
+                      <p className="mt-1 text-[0.68rem] uppercase tracking-[0.16em] text-foreground/70">{metric.name}</p>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground mt-3">
+                Last updated: {optimizeStatsUpdatedAt ? new Date(optimizeStatsUpdatedAt).toLocaleString() : 'Loading...'}
+              </p>
+            </>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border/60 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
+              No Optimize metrics found for this collection yet. Sync demo data first, or verify the Optimize collection ID.
+            </div>
+          )}
+        </section>
 
         <section className="border border-border/70 bg-background p-5">
           <div className="flex items-center justify-between mb-4">

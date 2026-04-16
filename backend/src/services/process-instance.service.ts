@@ -1,4 +1,6 @@
 import { operateClient } from "../clients/camunda.client.js";
+import { prisma } from "../lib/prisma.js";
+import { getDataSourceMode } from "./data-source.service.js";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -13,6 +15,29 @@ function normalizeSearchAfter(values: unknown[]): unknown[] {
 }
 
 async function listProcessInstances(pageSize = 100, bpmnProcessId?: string) {
+	if ((await getDataSourceMode()) === "db") {
+		const query: Parameters<typeof prisma.processInstanceSnapshot.findMany>[0] = {
+			orderBy: [{ startDate: "asc" }],
+		};
+		if (bpmnProcessId) {
+			query.where = { bpmnProcessId };
+		}
+
+		const rows = await prisma.processInstanceSnapshot.findMany(query);
+
+		return rows.map((row: { rawPayload: unknown; sourceKey: string; bpmnProcessId: string; processVersion: number | null; state: string; startDate: Date | null; endDate: Date | null; tenantId: string | null; incident: boolean }) => ({
+			...(row.rawPayload as Record<string, unknown>),
+			key: row.sourceKey,
+			bpmnProcessId: row.bpmnProcessId,
+			processVersion: row.processVersion ?? undefined,
+			state: row.state,
+			startDate: row.startDate ?? undefined,
+			endDate: row.endDate ?? undefined,
+			tenantId: row.tenantId ?? undefined,
+			incident: row.incident,
+		}));
+	}
+
 	const all = [];
 	let searchAfter: unknown[] | undefined;
 	const normalizedBpmnProcessId =
@@ -291,6 +316,23 @@ async function hydrateTruncatedVariables(items: unknown[]): Promise<unknown[]> {
 }
 
 async function getProcessInstanceDetails(instanceKey: string) {
+	if ((await getDataSourceMode()) === "db") {
+		const row = await prisma.processInstanceSnapshot.findUnique({
+			where: { sourceKey: instanceKey },
+		});
+
+		if (!row) {
+			throw new Error(`Process instance ${instanceKey} not found in demo database`);
+		}
+
+		return {
+			instance: row.rawPayload as Record<string, unknown>,
+			flowNodes: (row.flowNodes as unknown[] | null) ?? [],
+			variables: (row.variables as unknown[] | null) ?? [],
+			normalized: (row.normalized as Record<string, unknown> | null) ?? extractNormalizedData([]),
+		};
+	}
+
 	const instance = await operateClient.getProcessInstance(instanceKey);
 
 	const flownodes = await operateClient.searchFlownodeInstances({

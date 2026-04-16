@@ -1,4 +1,6 @@
 import { operateClient } from "../clients/camunda.client.js";
+import { prisma } from "../lib/prisma.js";
+import { getDataSourceMode } from "./data-source.service.js";
 function normalizeSearchAfter(values) {
     return values.map((value) => {
         if (value && typeof value === "object" && "value" in value) {
@@ -8,6 +10,26 @@ function normalizeSearchAfter(values) {
     });
 }
 async function listProcessInstances(pageSize = 100, bpmnProcessId) {
+    if ((await getDataSourceMode()) === "db") {
+        const query = {
+            orderBy: [{ startDate: "asc" }],
+        };
+        if (bpmnProcessId) {
+            query.where = { bpmnProcessId };
+        }
+        const rows = await prisma.processInstanceSnapshot.findMany(query);
+        return rows.map((row) => ({
+            ...row.rawPayload,
+            key: row.sourceKey,
+            bpmnProcessId: row.bpmnProcessId,
+            processVersion: row.processVersion ?? undefined,
+            state: row.state,
+            startDate: row.startDate ?? undefined,
+            endDate: row.endDate ?? undefined,
+            tenantId: row.tenantId ?? undefined,
+            incident: row.incident,
+        }));
+    }
     const all = [];
     let searchAfter;
     const normalizedBpmnProcessId = typeof bpmnProcessId === "string" && bpmnProcessId.trim().length > 0
@@ -236,6 +258,20 @@ async function hydrateTruncatedVariables(items) {
     }));
 }
 async function getProcessInstanceDetails(instanceKey) {
+    if ((await getDataSourceMode()) === "db") {
+        const row = await prisma.processInstanceSnapshot.findUnique({
+            where: { sourceKey: instanceKey },
+        });
+        if (!row) {
+            throw new Error(`Process instance ${instanceKey} not found in demo database`);
+        }
+        return {
+            instance: row.rawPayload,
+            flowNodes: row.flowNodes ?? [],
+            variables: row.variables ?? [],
+            normalized: row.normalized ?? extractNormalizedData([]),
+        };
+    }
     const instance = await operateClient.getProcessInstance(instanceKey);
     const flownodes = await operateClient.searchFlownodeInstances({
         filter: { processInstanceKey: instanceKey },

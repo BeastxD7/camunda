@@ -67,6 +67,17 @@ interface OptimizeEntityId {
   id: string;
 }
 
+interface DemoSourceModePayload {
+  mode: 'camunda' | 'db';
+}
+
+interface DemoSyncPayload {
+  collectionId: string;
+  processes: { count: number };
+  tasks: { count: number };
+  optimize: { dashboardsSynced: number; reportsSynced: number };
+}
+
 const api = {
   support: {
     listProcessInstances: (params?: { size?: number; bpmnProcessId?: string }) => {
@@ -129,6 +140,19 @@ const api = {
       }),
     getReportData: (reportId: string) =>
       request<any>(`/api/optimize/report-data?reportId=${encodeURIComponent(reportId)}`),
+  },
+  demo: {
+    getSourceMode: () => request<DemoSourceModePayload>("/api/demo/source"),
+    setSourceMode: (mode: 'camunda' | 'db') =>
+      request<DemoSourceModePayload>("/api/demo/source", {
+        method: 'POST',
+        body: JSON.stringify({ mode }),
+      }),
+    syncAll: (collectionId: string) =>
+      request<DemoSyncPayload>("/api/demo/sync", {
+        method: 'POST',
+        body: JSON.stringify({ collectionId }),
+      }),
   },
 }
 

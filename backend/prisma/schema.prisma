@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model ProcessInstanceSnapshot {
+  id              String   @id @default(cuid())
+  sourceKey       String   @unique
+  source          String   @default("camunda")
+  bpmnProcessId   String
+  processVersion  Int?
+  state           String
+  startDate       DateTime?
+  endDate         DateTime?
+  tenantId        String?
+  incident        Boolean  @default(false)
+  rawPayload      Json
+  variables       Json?
+  flowNodes       Json?
+  normalized      Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([bpmnProcessId])
+  @@index([state])
+  @@index([startDate])
+}
+
+model TaskSnapshot {
+  id              String   @id @default(cuid())
+  sourceKey       String   @unique
+  source          String   @default("camunda")
+  taskState       String
+  name            String?
+  taskDefinitionId String?
+  processName     String?
+  processInstanceKey String?
+  assignee        String?
+  creationDate    DateTime?
+  dueDate         DateTime?
+  followUpDate    DateTime?
+  tenantId        String?
+  candidateGroups Json?
+  candidateUsers  Json?
+  formKey         String?
+  formId          String?
+  formVersion     String?
+  implementation  String?
+  variables       Json?
+  taskDetails     Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([taskState])
+  @@index([assignee])
+  @@index([processInstanceKey])
+}
+
+model OptimizeDashboardSnapshot {
+  id              String   @id @default(cuid())
+  sourceKey       String   @unique
+  source          String   @default("camunda")
+  collectionId    String
+  name            String?
+  description     String?
+  dashboardId     String
+  dashboardData   Json
+  reportsData     Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([collectionId])
+  @@index([dashboardId])
+}
+
+model OptimizeReportSnapshot {
+  id             String   @id @default(cuid())
+  sourceKey      String   @unique
+  source         String   @default("camunda")
+  collectionId   String
+  dashboardId    String?
+  reportId       String
+  name           String?
+  description    String?
+  reportData     Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([collectionId])
+  @@index([dashboardId])
+  @@index([reportId])
+}
+
+model AppSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+}
