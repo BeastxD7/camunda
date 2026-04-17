@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { RefreshCw, Search, X, ArrowLeft } from 'lucide-react';
 import { api } from '../lib/api';
 import type { ProcessInstance } from '../types/support';
@@ -11,12 +11,15 @@ import { ProcessTable } from '../components/process/ProcessTable';
  */
 export const ProcessList: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [allProcesses, setAllProcesses] = useState<ProcessInstance[]>([]);
   const [filteredProcesses, setFilteredProcesses] = useState<ProcessInstance[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [incidentFilter, setIncidentFilter] = useState<'all' | 'true' | 'false'>('all');
+  const [durationBucketFilter, setDurationBucketFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'latest' | 'oldest'>('latest');
 
   const statuses = ['ACTIVE', 'COMPLETED', 'CANCELED', 'TERMINATED'];
@@ -26,8 +29,48 @@ export const ProcessList: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const stateQuery = (searchParams.get('state') || '').toUpperCase();
+    const incidentQuery = (searchParams.get('incident') || '').toLowerCase();
+    const bucketQuery = (searchParams.get('durationBucket') || '').trim();
+
+    if (stateQuery && statuses.includes(stateQuery)) {
+      setSelectedStatuses([stateQuery]);
+    }
+
+    if (incidentQuery === 'true' || incidentQuery === 'false') {
+      setIncidentFilter(incidentQuery);
+    }
+
+    if (bucketQuery) {
+      setDurationBucketFilter(bucketQuery);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     filterProcesses();
-  }, [allProcesses, searchTerm, selectedStatuses]);
+  }, [allProcesses, searchTerm, selectedStatuses, incidentFilter, durationBucketFilter]);
+
+  const getDurationBucket = (process: ProcessInstance): string => {
+    const startedAt = process.startDate ? new Date(process.startDate).getTime() : NaN;
+    const endedAt = process.endDate ? new Date(process.endDate).getTime() : NaN;
+    const isActive = String(process.state || '').toUpperCase() === 'ACTIVE';
+
+    if (!Number.isFinite(startedAt)) {
+      return 'Unknown';
+    }
+
+    if (!Number.isFinite(endedAt)) {
+      return isActive ? 'In Progress' : 'Unknown';
+    }
+
+    const durationMs = Math.max(0, endedAt - startedAt);
+    const minutes = durationMs / 60000;
+
+    if (minutes < 1) return '< 1 min';
+    if (minutes < 3) return '1-3 min';
+    if (minutes < 10) return '3-10 min';
+    return '10+ min';
+  };
 
   const loadProcesses = async () => {
     setLoading(true);
@@ -54,6 +97,15 @@ export const ProcessList: React.FC = () => {
 
     if (selectedStatuses.length > 0) {
       filtered = filtered.filter((p) => p.state && selectedStatuses.includes(p.state));
+    }
+
+    if (incidentFilter !== 'all') {
+      const incidentExpected = incidentFilter === 'true';
+      filtered = filtered.filter((p) => Boolean(p.incident) === incidentExpected);
+    }
+
+    if (durationBucketFilter !== 'all') {
+      filtered = filtered.filter((p) => getDurationBucket(p) === durationBucketFilter);
     }
 
     setFilteredProcesses(filtered);
@@ -92,6 +144,9 @@ export const ProcessList: React.FC = () => {
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedStatuses([]);
+    setIncidentFilter('all');
+    setDurationBucketFilter('all');
+    navigate('/processes');
   };
 
   return (
@@ -174,6 +229,32 @@ export const ProcessList: React.FC = () => {
             {/* Sort and Clear Controls */}
             <div className="flex items-center gap-2">
               <select
+                value={incidentFilter}
+                onChange={(e) => setIncidentFilter(e.target.value as 'all' | 'true' | 'false')}
+                className="text-sm rounded-lg border border-border/70 bg-background px-3 py-1.5 text-foreground cursor-pointer hover:border-border/100 transition-colors"
+                aria-label="Filter incident state"
+              >
+                <option value="all">All Incidents</option>
+                <option value="true">Incident Only</option>
+                <option value="false">Healthy Only</option>
+              </select>
+
+              <select
+                value={durationBucketFilter}
+                onChange={(e) => setDurationBucketFilter(e.target.value)}
+                className="text-sm rounded-lg border border-border/70 bg-background px-3 py-1.5 text-foreground cursor-pointer hover:border-border/100 transition-colors"
+                aria-label="Filter by duration bucket"
+              >
+                <option value="all">All Durations</option>
+                <option value="< 1 min">&lt; 1 min</option>
+                <option value="1-3 min">1-3 min</option>
+                <option value="3-10 min">3-10 min</option>
+                <option value="10+ min">10+ min</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Unknown">Unknown</option>
+              </select>
+
+              <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as 'latest' | 'oldest')}
                 className="text-sm rounded-lg border border-border/70 bg-background px-3 py-1.5 text-foreground cursor-pointer hover:border-border/100 transition-colors"
@@ -183,7 +264,7 @@ export const ProcessList: React.FC = () => {
                 <option value="oldest">Oldest First</option>
               </select>
 
-              {(searchTerm || selectedStatuses.length > 0) && (
+              {(searchTerm || selectedStatuses.length > 0 || incidentFilter !== 'all' || durationBucketFilter !== 'all') && (
                 <button
                   onClick={clearFilters}
                   className="text-xs font-medium px-3 py-1.5 rounded-lg bg-muted/50 text-muted-foreground hover:bg-muted transition-colors"

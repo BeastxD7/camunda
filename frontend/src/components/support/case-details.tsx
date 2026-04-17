@@ -62,37 +62,63 @@ export function CaseDetails({ details, selectedCase, isLoading, error }: CaseDet
   const rawMessages = Array.isArray(conversationData?.messages)
     ? (conversationData.messages as UnknownRecord[])
     : []
-  const conversationMessages = rawMessages
-    .map((message) => {
-      const role = String(message.role || "")
-      const text = readMessageText(message.content)
-      const metadata = toRecord(message.metadata)
-      const timestamp = String(metadata?.timestamp || "")
-      
-      // Extract tool calls and results
-      const toolCalls = Array.isArray(message.toolCalls)
-        ? (message.toolCalls as UnknownRecord[])
-        : []
-      const toolResults = Array.isArray(message.results)
-        ? (message.results as UnknownRecord[])
-        : []
+  const normalizedConversationMessages = rawMessages.map((message) => {
+    const role = String(message.role || "")
+    const text = readMessageText(message.content)
+    const metadata = toRecord(message.metadata)
+    const timestamp = String(metadata?.timestamp || "")
 
-      return {
-        role,
-        text,
-        timestamp,
-        toolCalls,
-        toolResults,
+    const toolCalls = Array.isArray(message.toolCalls)
+      ? (message.toolCalls as UnknownRecord[])
+      : []
+    const toolResults = Array.isArray(message.results)
+      ? (message.results as UnknownRecord[])
+      : []
+
+    return {
+      role,
+      text,
+      timestamp,
+      toolCalls,
+      toolResults,
+    }
+  })
+
+  const conversationMessages: ConversationMessage[] = []
+  for (let index = 0; index < normalizedConversationMessages.length; index += 1) {
+    const message = normalizedConversationMessages[index]
+    const isSupportedRole = message.role === "user" || message.role === "assistant"
+    if (!isSupportedRole) {
+      continue
+    }
+
+    const mergedResults = [...message.toolResults]
+    let cursor = index + 1
+    while (cursor < normalizedConversationMessages.length) {
+      const nextMessage = normalizedConversationMessages[cursor]
+      if (nextMessage.role !== "tool_call_result") {
+        break
       }
-    })
-    .filter((message) => (message.role === "user" || message.role === "assistant") && message.text)
+
+      mergedResults.push(...nextMessage.toolResults)
+      cursor += 1
+    }
+
+    if (cursor > index + 1) {
+      index = cursor - 1
+    }
+
+    if (message.text || message.toolCalls.length > 0 || mergedResults.length > 0) {
+      conversationMessages.push({
+        ...message,
+        toolResults: mergedResults,
+      })
+    }
+  }
   
 
   return (
-    <article className="support-card rounded-3xl border border-border/60 p-4 md:p-5">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-base font-semibold">Case Details</h2>
-      </div>
+    <article className="border border-border/70 bg-background p-5 space-y-6">
 
       {isLoading ? <p className="text-sm text-muted-foreground">Loading selected case...</p> : null}
 
@@ -167,7 +193,7 @@ function ConversationMessageBox({ message, index }: { message: ConversationMessa
   }
 
   return (
-    <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
+    <div className="rounded-lg border border-border/70 bg-background p-4">
       {/* Message header with role and timestamp */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${roleClass(message.role)}`}>
@@ -187,39 +213,59 @@ function ConversationMessageBox({ message, index }: { message: ConversationMessa
           <div className="flex flex-wrap items-center gap-1.5">
             <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-xs text-muted-foreground font-medium">Tools used:</span>
-            {message.toolCalls.map((toolCall, idx) => (
-              <Dialog key={`${index}-tool-dialog-${idx}`} open={selectedToolIdx === idx} onOpenChange={(open) => setSelectedToolIdx(open ? idx : null)}>
-                <DialogTrigger asChild>
-                  <button className="cursor-pointer hover:opacity-80 transition">
-                    <Badge variant="info">
-                      {String(toolCall.name || "Unknown")}
-                    </Badge>
-                  </button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Tool Details: {String(toolCall.name || "Unknown")}</DialogTitle>
-                    <DialogDescription>
-                      View the input parameters and execution details for this tool call.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-sm font-semibold mb-2">Input Parameters</h3>
-                      <div className="rounded-lg border border-border/40 bg-muted/30 p-3">
-                        <ToolParametersDisplay value={toolCall.arguments} />
+            {message.toolCalls.map((toolCall, idx) => {
+              const toolCallId = String(toolCall.id || "")
+              const resultMatchedById = message.toolResults.find(
+                (result) => String(result.id || "") === toolCallId,
+              )
+              const matchedResult = resultMatchedById || message.toolResults[idx] || null
+
+              return (
+                <Dialog key={`${index}-tool-dialog-${idx}`} open={selectedToolIdx === idx} onOpenChange={(open) => setSelectedToolIdx(open ? idx : null)}>
+                  <DialogTrigger asChild>
+                    <button className="cursor-pointer hover:opacity-80 transition">
+                      <Badge variant="info">
+                        {String(toolCall.name || "Unknown")}
+                      </Badge>
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Tool Details: {String(toolCall.name || "Unknown")}</DialogTitle>
+                      <DialogDescription>
+                        View the input parameters and execution details for this tool call.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="text-sm font-semibold mb-2">Input Parameters</h3>
+                        <div className="rounded-lg border border-border/40 bg-muted/30 p-3">
+                          <ToolParametersDisplay value={toolCall.arguments} />
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold mb-2">Tool Call ID</h3>
+                        <div className="rounded-lg border border-border/40 bg-muted/30 p-2 text-xs font-mono text-muted-foreground break-all">
+                          {String(toolCall.id || "-")}
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold mb-2">Tool Call Result</h3>
+                        {matchedResult ? (
+                          <div className="rounded-lg border border-border/40 bg-background p-3">
+                            <ToolParametersDisplay value={matchedResult.content} />
+                          </div>
+                        ) : (
+                          <div className="rounded-lg border border-border/40 bg-muted/30 p-3 text-xs text-muted-foreground">
+                            No matched tool result found for this tool call yet.
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <div>
-                      <h3 className="text-sm font-semibold mb-2">Tool Call ID</h3>
-                      <div className="rounded-lg border border-border/40 bg-muted/30 p-2 text-xs font-mono text-muted-foreground break-all">
-                        {String(toolCall.id || "-")}
-                      </div>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            ))}
+                  </DialogContent>
+                </Dialog>
+              )
+            })}
           </div>
         </div>
       )}
@@ -295,9 +341,9 @@ function ConversationMessageBox({ message, index }: { message: ConversationMessa
                                       score {((item as UnknownRecord).score as number).toFixed(3)}
                                     </Badge>
                                   )}
-                                  <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-wrap">
-                                    {String((item as UnknownRecord).content || "")}
-                                  </p>
+                                  <div className="text-xs text-foreground/80 leading-relaxed whitespace-pre-wrap">
+                                    <ToolParametersDisplay value={(item as UnknownRecord).content ?? item} />
+                                  </div>
                                 </>
                               ) : (
                                 <p className="text-xs text-foreground/80">{String(item)}</p>
@@ -307,9 +353,7 @@ function ConversationMessageBox({ message, index }: { message: ConversationMessa
                         </div>
                       ) : (
                         <div className="rounded p-3 bg-muted/30 border border-border/40">
-                          <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-wrap">
-                            {String(toolContent)}
-                          </p>
+                          <ToolParametersDisplay value={toolContent} />
                         </div>
                       )}
                     </div>
@@ -331,9 +375,9 @@ function ConversationMessageBox({ message, index }: { message: ConversationMessa
                                       score {((item as UnknownRecord).score as number).toFixed(3)}
                                     </Badge>
                                   )}
-                                  <p className="text-foreground/80 leading-relaxed whitespace-pre-wrap">
-                                    {String((item as UnknownRecord).content || "")}
-                                  </p>
+                                  <div className="text-foreground/80 leading-relaxed whitespace-pre-wrap">
+                                    <ToolParametersDisplay value={(item as UnknownRecord).content ?? item} />
+                                  </div>
                                 </>
                               ) : (
                                 <p className="text-foreground/80">{String(item)}</p>
@@ -342,9 +386,7 @@ function ConversationMessageBox({ message, index }: { message: ConversationMessa
                           ))}
                         </div>
                       ) : (
-                        <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-wrap">
-                          {String(toolContent)}
-                        </p>
+                        <ToolParametersDisplay value={toolContent} />
                       )}
                     </div>
                   )}
@@ -360,8 +402,8 @@ function ConversationMessageBox({ message, index }: { message: ConversationMessa
 
 function DetailBlock({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-2xl border border-border/60 bg-background/70 p-3">
-      <h3 className="mb-2 text-sm font-semibold">{title}</h3>
+    <section className="rounded-lg border border-border/70 bg-background p-4">
+      {title && <h3 className="mb-3 text-sm font-semibold">{title}</h3>}
       {children}
     </section>
   )

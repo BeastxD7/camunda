@@ -8,11 +8,25 @@ function notFoundHandler(req: Request, res: Response, _next: NextFunction) {
 	});
 }
 
-function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction) {
+function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction) {
 	const upstreamStatus = getUpstreamStatus(err);
 	const message = err instanceof Error ? err.message : "Unexpected server error";
 	const target = getUpstreamTarget(err);
 	const isOptimizeTarget = typeof target === "string" && target.includes("optimize.camunda.io");
+	const isCamundaTarget =
+		typeof target === "string" &&
+		(target.includes("operate.camunda.io") ||
+			target.includes("optimize.camunda.io") ||
+			target.includes("tasklist.camunda.io") ||
+			target.includes("zeebe.camunda.io"));
+	const isDemoRoute = req.originalUrl.startsWith("/api/demo");
+
+	if (isPrismaAuthError(err) || isPrismaConnectionError(err)) {
+		return apiError(res, 503, "Database is temporarily unavailable", {
+			code: "DATABASE_UNAVAILABLE",
+			hint: "Ensure local Postgres is running and DATABASE_URL in backend/.env is valid.",
+		});
+	}
 
 	if (upstreamStatus === 503) {
 		return apiError(res, 503, "Camunda Operate is temporarily unavailable", {
@@ -22,11 +36,18 @@ function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFun
 		});
 	}
 
-	if (isConnectionRefusedError(err)) {
+	if (isConnectionRefusedError(err) && isCamundaTarget) {
 		return apiError(res, 502, "Unable to connect to Camunda Operate", {
 			code: "CAMUNDA_OPERATE_UNREACHABLE",
 			hint: "Verify CAMUNDA_OPERATE_BASE_URL and OAuth/client credentials in backend/.env",
 			target: err.url,
+		});
+	}
+
+	if (isConnectionRefusedError(err) && isDemoRoute) {
+		return apiError(res, 503, "Database is temporarily unavailable", {
+			code: "DATABASE_UNAVAILABLE",
+			hint: "Ensure local Postgres container is up and reachable on localhost:5432.",
 		});
 	}
 
@@ -138,6 +159,35 @@ function isConnectionRefusedError(err: unknown): err is MaybeNetworkError {
 
 	const candidate = err as MaybeNetworkError;
 	return candidate.code === "ECONNREFUSED";
+}
+
+function isPrismaAuthError(err: unknown): boolean {
+	if (!err || typeof err !== "object") {
+		return false;
+	}
+
+	const candidate = err as MaybeNetworkError & { code?: string };
+	const message = typeof candidate.message === "string" ? candidate.message : "";
+
+	return (
+		candidate.code === "P1000" ||
+		message.includes("Authentication failed against database server")
+	);
+}
+
+function isPrismaConnectionError(err: unknown): boolean {
+	if (!err || typeof err !== "object") {
+		return false;
+	}
+
+	const candidate = err as MaybeNetworkError & { code?: string };
+	const message = typeof candidate.message === "string" ? candidate.message : "";
+
+	return (
+		candidate.code === "P1001" ||
+		message.includes("Can't reach database server") ||
+		message.includes("database server")
+	);
 }
 
 export { notFoundHandler, errorHandler };

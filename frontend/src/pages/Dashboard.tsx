@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RefreshCw, AlertCircle, CheckCircle2, Clock3, ExternalLink } from 'lucide-react';
 import { api, type OptimizeDashboard } from '../lib/api';
@@ -8,6 +8,12 @@ import { StatsGrid } from '../components/support/stats';
 import { ProcessTable } from '../components/process/ProcessTable';
 import { isDurationMetricName, formatDuration } from '../lib/support-formatters';
 import { MetricGridSkeleton, StatsGridSkeleton, ProcessTableSkeleton } from '../components/ui/skeleton';
+
+const DonutMetricCard = lazy(() =>
+  import('../components/support/DonutMetricCard').then((module) => ({
+    default: module.DonutMetricCard,
+  })),
+);
 
 const DEFAULT_COLLECTION_ID =
   import.meta.env.VITE_OPTIMIZE_COLLECTION_ID || '44d4a885-b01c-42ef-8d3b-1cd43bc695eb';
@@ -210,12 +216,112 @@ export const DashboardPage: React.FC = () => {
     return sortedProcesses.slice(0, 5);
   }, [sortedProcesses]);
 
+  const statusSlices = useMemo(() => {
+    const counts = {
+      ACTIVE: 0,
+      COMPLETED: 0,
+      CANCELED: 0,
+      TERMINATED: 0,
+      OTHER: 0,
+    }
+
+    for (const process of processes) {
+      const state = String(process.state || '').toUpperCase()
+      if (state === 'ACTIVE') counts.ACTIVE += 1
+      else if (state === 'COMPLETED') counts.COMPLETED += 1
+      else if (state === 'CANCELED') counts.CANCELED += 1
+      else if (state === 'TERMINATED') counts.TERMINATED += 1
+      else counts.OTHER += 1
+    }
+
+    return [
+      { label: 'Active', value: counts.ACTIVE, color: '#06b6d4' },
+      { label: 'Completed', value: counts.COMPLETED, color: '#34d399' },
+      { label: 'Canceled', value: counts.CANCELED, color: '#f43f5e' },
+      { label: 'Terminated', value: counts.TERMINATED, color: '#f59e0b' },
+      { label: 'Other', value: counts.OTHER, color: '#64748b' },
+    ]
+  }, [processes])
+
+  const incidentSlices = useMemo(() => {
+    const flagged = processes.filter((p) => Boolean(p.incident)).length
+    const healthy = Math.max(processes.length - flagged, 0)
+    return [
+      { label: 'Incident', value: flagged, color: '#f43f5e' },
+      { label: 'Healthy', value: healthy, color: '#2dd4bf' },
+    ]
+  }, [processes])
+
+  const slaSlices = useMemo(() => {
+    const buckets = {
+      under1m: 0,
+      oneToThree: 0,
+      threeToTen: 0,
+      overTen: 0,
+      inProgress: 0,
+      unknown: 0,
+    }
+
+    for (const process of processes) {
+      const startedAt = process.startDate ? new Date(process.startDate).getTime() : NaN
+      const endedAt = process.endDate ? new Date(process.endDate).getTime() : NaN
+      const isActive = String(process.state || '').toUpperCase() === 'ACTIVE'
+
+      if (!Number.isFinite(startedAt)) {
+        buckets.unknown += 1
+        continue
+      }
+
+      if (!Number.isFinite(endedAt)) {
+        if (isActive) buckets.inProgress += 1
+        else buckets.unknown += 1
+        continue
+      }
+
+      const durationMs = Math.max(0, endedAt - startedAt)
+      const minutes = durationMs / 60000
+
+      if (minutes < 1) buckets.under1m += 1
+      else if (minutes < 3) buckets.oneToThree += 1
+      else if (minutes < 10) buckets.threeToTen += 1
+      else buckets.overTen += 1
+    }
+
+    return [
+      { label: '< 1 min', value: buckets.under1m, color: '#22d3ee' },
+      { label: '1-3 min', value: buckets.oneToThree, color: '#3b82f6' },
+      { label: '3-10 min', value: buckets.threeToTen, color: '#f59e0b' },
+      { label: '10+ min', value: buckets.overTen, color: '#f43f5e' },
+      { label: 'In Progress', value: buckets.inProgress, color: '#8b5cf6' },
+      { label: 'Unknown', value: buckets.unknown, color: '#64748b' },
+    ]
+  }, [processes])
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await loadProcesses();
     await loadOptimizeDashboards(DEFAULT_COLLECTION_ID);
     setIsRefreshing(false);
   };
+
+  const handleStatusSliceClick = (slice: { label: string }) => {
+    const state = slice.label.toUpperCase()
+    if (!['ACTIVE', 'COMPLETED', 'CANCELED', 'TERMINATED'].includes(state)) {
+      navigate('/processes')
+      return
+    }
+
+    navigate(`/processes?state=${encodeURIComponent(state)}`)
+  }
+
+  const handleIncidentSliceClick = (slice: { label: string }) => {
+    const incident = slice.label.toLowerCase() === 'incident' ? 'true' : 'false'
+    navigate(`/processes?incident=${incident}`)
+  }
+
+  const handleSlaSliceClick = (slice: { label: string }) => {
+    navigate(`/processes?durationBucket=${encodeURIComponent(slice.label)}`)
+  }
 
   return (
     <PageContainer>
@@ -240,23 +346,51 @@ export const DashboardPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Stats Section with Lazy Loading */}
-        {loading ? (
-          <StatsGridSkeleton />
-        ) : (
-          <StatsGrid
-            stats={stats}
-            icons={{
-              total: <Clock3 className="h-4 w-4" />,
-              active: <AlertCircle className="h-4 w-4" />,
-              completed: <CheckCircle2 className="h-4 w-4" />,
-              flagged: <AlertCircle className="h-4 w-4" />,
-            }}
-          />
-        )}
-
         <section className="border border-border/70 bg-background p-5">
-          <h2 className="text-xl font-semibold mb-4">Support Case Metrics</h2>
+          <h2 className="text-xl font-semibold mb-4">Current Cases</h2>
+
+          {loading ? (
+            <StatsGridSkeleton />
+          ) : (
+            <StatsGrid
+              stats={stats}
+              icons={{
+                total: <Clock3 className="h-4 w-4" />,
+                active: <AlertCircle className="h-4 w-4" />,
+                completed: <CheckCircle2 className="h-4 w-4" />,
+                flagged: <AlertCircle className="h-4 w-4" />,
+              }}
+            />
+          )}
+
+          <div className="mt-4">
+            <Suspense fallback={<MetricGridSkeleton count={3} />}>
+              <section className="grid gap-3 lg:grid-cols-3">
+                <DonutMetricCard
+                  title="Case Status Mix"
+                  subtitle="Distribution by process state"
+                  slices={statusSlices}
+                  onSliceClick={handleStatusSliceClick}
+                />
+                <DonutMetricCard
+                  title="Incident Risk Split"
+                  subtitle="Cases with incidents vs healthy cases"
+                  slices={incidentSlices}
+                  onSliceClick={handleIncidentSliceClick}
+                />
+                <DonutMetricCard
+                  title="Resolution Time Buckets"
+                  subtitle="SLA-style grouping from start to end time"
+                  slices={slaSlices}
+                  onSliceClick={handleSlaSliceClick}
+                />
+              </section>
+            </Suspense>
+          </div>
+
+          <div className="my-5 border-t border-border/70" />
+
+          <h2 className="text-xl font-semibold mb-4">Overall Support Case Metrics</h2>
           {metricsLoading ? (
             <>
               <MetricGridSkeleton count={4} />
