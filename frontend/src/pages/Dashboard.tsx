@@ -20,6 +20,78 @@ const DEFAULT_COLLECTION_ID =
 const DEFAULT_SUPPORT_BPMN_PROCESS_ID =
   import.meta.env.VITE_SUPPORT_BPMN_PROCESS_ID || 'Process_15wz3ez';
 
+const PIE_PALETTE = ['#06b6d4', '#34d399', '#3b82f6', '#f59e0b', '#f43f5e', '#8b5cf6', '#64748b'];
+
+type DonutSlice = {
+  label: string;
+  value: number;
+  color: string;
+};
+
+type OptimizeReportView =
+  | { id: string; name: string; kind: 'metric'; value: number }
+  | { id: string; name: string; kind: 'pie'; slices: DonutSlice[] };
+
+function toFiniteNumber(value: unknown): number | null {
+  const numeric = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function extractPieSlices(payload: unknown): DonutSlice[] | null {
+  const candidateArrays: unknown[] = [];
+
+  if (Array.isArray(payload)) {
+    candidateArrays.push(payload);
+  }
+
+  if (payload && typeof payload === 'object') {
+    const record = payload as Record<string, unknown>;
+    candidateArrays.push(record.data, record.values, record.result);
+
+    const result = record.result;
+    if (result && typeof result === 'object') {
+      const nested = result as Record<string, unknown>;
+      candidateArrays.push(nested.data, nested.values);
+    }
+  }
+
+  for (const candidate of candidateArrays) {
+    if (!Array.isArray(candidate) || candidate.length === 0) {
+      continue;
+    }
+
+    const slices = candidate
+      .map((item, index) => {
+        if (!item || typeof item !== 'object') {
+          return null;
+        }
+
+        const row = item as Record<string, unknown>;
+        const labelRaw = row.label ?? row.name ?? row.group ?? row.key ?? row.category;
+        const valueRaw = row.value ?? row.count ?? row.data ?? row.amount;
+        const label = typeof labelRaw === 'string' ? labelRaw.trim() : '';
+        const value = toFiniteNumber(valueRaw);
+
+        if (!label || value === null || value < 0) {
+          return null;
+        }
+
+        return {
+          label,
+          value,
+          color: PIE_PALETTE[index % PIE_PALETTE.length],
+        } as DonutSlice;
+      })
+      .filter((slice): slice is DonutSlice => Boolean(slice));
+
+    if (slices.length >= 2 && slices.some((slice) => slice.value > 0)) {
+      return slices;
+    }
+  }
+
+  return null;
+}
+
 /**
  * Dashboard page - overview of all processes and statistics
  */
@@ -165,7 +237,7 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
-  const supportCaseMetrics = useMemo(() => {
+  const optimizeReports = useMemo<OptimizeReportView[]>(() => {
     for (const dashboardId of dashboardIds) {
       const dashboard = dashboardMetaById[dashboardId];
       if (!dashboard || !Array.isArray(dashboard.reports) || dashboard.reports.length === 0) {
@@ -176,19 +248,43 @@ export const DashboardPage: React.FC = () => {
         .filter((report) => typeof report.id === 'string' && report.id.trim().length > 0)
         .map((report) => {
           const reportId = report.id as string;
-          const rawValue = reportDataById[reportId]?.data;
+          const payload = reportDataById[reportId];
+          const pieSlices = extractPieSlices(payload);
+
+          if (pieSlices) {
+            return {
+              id: reportId,
+              name: report.name || 'Unnamed Report',
+              kind: 'pie' as const,
+              slices: pieSlices,
+            };
+          }
+
+          const rawValue =
+            (payload && typeof payload === 'object' ? (payload as Record<string, unknown>).data : payload) ?? 0;
           const value = typeof rawValue === 'number' ? rawValue : Number(rawValue ?? 0);
 
           return {
             id: reportId,
             name: report.name || 'Unnamed Report',
+            kind: 'metric' as const,
             value: Number.isFinite(value) ? value : 0,
           };
         });
     }
 
-    return [] as Array<{ id: string; name: string; value: number }>;
+    return [] as OptimizeReportView[];
   }, [dashboardIds, dashboardMetaById, reportDataById]);
+
+  const supportCaseMetrics = useMemo(
+    () => optimizeReports.filter((report): report is Extract<OptimizeReportView, { kind: 'metric' }> => report.kind === 'metric'),
+    [optimizeReports],
+  );
+
+  const optimizePieReports = useMemo(
+    () => optimizeReports.filter((report): report is Extract<OptimizeReportView, { kind: 'pie' }> => report.kind === 'pie'),
+    [optimizeReports],
+  );
 
   const stats = useMemo(() => {
     const active = processes.filter((p) => p.state === 'ACTIVE').length;
@@ -396,26 +492,42 @@ export const DashboardPage: React.FC = () => {
               <MetricGridSkeleton count={4} />
               <p className="text-xs text-muted-foreground mt-3 animate-pulse">Loading metrics...</p>
             </>
-          ) : supportCaseMetrics.length > 0 ? (
+          ) : optimizePieReports.length > 0 || supportCaseMetrics.length > 0 ? (
             <>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {supportCaseMetrics.map((metric) => {
-                  const isDuration = isDurationMetricName(metric.name)
-                  const displayValue = isDuration && typeof metric.value === 'number' 
-                    ? formatDuration(metric.value)
-                    : metric.value
-                  
-                  return (
-                    <div
-                      key={metric.id}
-                      className="brand-metric-card rounded-lg px-4 py-4 text-foreground"
-                    >
-                      <p className="text-3xl font-semibold tracking-tight">{displayValue}</p>
-                      <p className="mt-1 text-[0.68rem] uppercase tracking-[0.16em] text-foreground/70">{metric.name}</p>
-                    </div>
-                  );
-                })}
-              </div>
+              {optimizePieReports.length > 0 ? (
+                <div className="grid gap-3 lg:grid-cols-3">
+                  {optimizePieReports.map((report) => (
+                    <DonutMetricCard
+                      key={report.id}
+                      title={report.name}
+                      subtitle="Optimize pie report"
+                      slices={report.slices}
+                    />
+                  ))}
+                </div>
+              ) : null}
+
+              {supportCaseMetrics.length > 0 ? (
+                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {supportCaseMetrics.map((metric) => {
+                    const isDuration = isDurationMetricName(metric.name)
+                    const displayValue = isDuration && typeof metric.value === 'number' 
+                      ? formatDuration(metric.value)
+                      : metric.value
+                    
+                    return (
+                      <div
+                        key={metric.id}
+                        className="brand-metric-card rounded-lg px-4 py-4 text-foreground"
+                      >
+                        <p className="text-3xl font-semibold tracking-tight">{displayValue}</p>
+                        <p className="mt-1 text-[0.68rem] uppercase tracking-[0.16em] text-foreground/70">{metric.name}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+
               <p className="text-xs text-muted-foreground mt-3">
                 Last updated: {optimizeStatsUpdatedAt ? new Date(optimizeStatsUpdatedAt).toLocaleString() : 'Loading...'}
               </p>
