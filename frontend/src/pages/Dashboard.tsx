@@ -15,6 +15,12 @@ const DonutMetricCard = lazy(() =>
   })),
 );
 
+const BarMetricCard = lazy(() =>
+  import('../components/support/BarMetricCard').then((module) => ({
+    default: module.BarMetricCard,
+  })),
+);
+
 const DEFAULT_COLLECTION_ID =
   import.meta.env.VITE_OPTIMIZE_COLLECTION_ID || '44d4a885-b01c-42ef-8d3b-1cd43bc695eb';
 const DEFAULT_SUPPORT_BPMN_PROCESS_ID =
@@ -30,14 +36,59 @@ type DonutSlice = {
 
 type OptimizeReportView =
   | { id: string; name: string; kind: 'metric'; value: number }
-  | { id: string; name: string; kind: 'pie'; slices: DonutSlice[] };
+  | { id: string; name: string; kind: 'pie'; slices: DonutSlice[] }
+  | { id: string; name: string; kind: 'bar'; slices: DonutSlice[] };
+
+type OptimizeChartType = 'pie' | 'bar' | 'metric' | 'heatmap' | 'unknown';
+
+type ReportMeta = {
+  id: string;
+  name: string;
+  chartType: OptimizeChartType;
+};
 
 function toFiniteNumber(value: unknown): number | null {
   const numeric = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(numeric) ? numeric : null;
 }
 
-function extractPieSlices(payload: unknown): DonutSlice[] | null {
+function detectChartTypeFromDefinition(definition: Record<string, unknown>): OptimizeChartType {
+  const directCandidates = [
+    definition.visualization,
+    definition.visualizationType,
+    definition.chartType,
+    definition.type,
+    definition.reportType,
+    definition.view,
+  ]
+    .filter((value): value is string => typeof value === 'string')
+    .map((value) => value.toLowerCase());
+
+  if (directCandidates.some((candidate) => candidate.includes('pie') || candidate.includes('donut'))) {
+    return 'pie';
+  }
+
+  if (directCandidates.some((candidate) => candidate.includes('bar') || candidate.includes('histogram'))) {
+    return 'bar';
+  }
+
+  if (directCandidates.some((candidate) => candidate.includes('heatmap') || candidate.includes('heat_map'))) {
+    return 'heatmap';
+  }
+
+  if (directCandidates.some((candidate) => candidate.includes('number') || candidate.includes('single') || candidate.includes('metric'))) {
+    return 'metric';
+  }
+
+  const flattened = JSON.stringify(definition).toLowerCase();
+  if (flattened.includes('"pie"') || flattened.includes('"donut"')) return 'pie';
+  if (flattened.includes('"bar"') || flattened.includes('"histogram"')) return 'bar';
+  if (flattened.includes('"heatmap"') || flattened.includes('"heat_map"')) return 'heatmap';
+  if (flattened.includes('single_number') || flattened.includes('single value') || flattened.includes('kpi')) return 'metric';
+  return 'unknown';
+}
+
+function extractCategoricalSlices(payload: unknown): DonutSlice[] | null {
   const candidateArrays: unknown[] = [];
 
   if (Array.isArray(payload)) {
@@ -92,6 +143,54 @@ function extractPieSlices(payload: unknown): DonutSlice[] | null {
   return null;
 }
 
+function isHeatmapPayload(payload: unknown): boolean {
+  const candidateArrays: unknown[] = [];
+
+  if (Array.isArray(payload)) {
+    candidateArrays.push(payload);
+  }
+
+  if (payload && typeof payload === 'object') {
+    const record = payload as Record<string, unknown>;
+    candidateArrays.push(record.data, record.values, record.result);
+
+    const result = record.result;
+    if (result && typeof result === 'object') {
+      const nested = result as Record<string, unknown>;
+      candidateArrays.push(nested.data, nested.values);
+    }
+  }
+
+  for (const candidate of candidateArrays) {
+    if (!Array.isArray(candidate) || candidate.length < 10) {
+      continue;
+    }
+
+    let bpmKeyMatches = 0;
+    let objectRows = 0;
+
+    for (const item of candidate) {
+      if (!item || typeof item !== 'object') {
+        continue;
+      }
+
+      objectRows += 1;
+      const row = item as Record<string, unknown>;
+      const key = typeof row.key === 'string' ? row.key : '';
+
+      if (/^(activity|event|gateway|task|subprocess|callactivity|sequenceflow)_/i.test(key)) {
+        bpmKeyMatches += 1;
+      }
+    }
+
+    if (objectRows >= 10 && bpmKeyMatches >= Math.max(4, Math.floor(objectRows * 0.4))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /**
  * Dashboard page - overview of all processes and statistics
  */
@@ -102,6 +201,7 @@ export const DashboardPage: React.FC = () => {
   const [dashboardIds, setDashboardIds] = useState<string[]>([]);
   const [dashboardMetaById, setDashboardMetaById] = useState<Record<string, OptimizeDashboard>>({});
   const [reportDataById, setReportDataById] = useState<Record<string, any>>({});
+  const [reportMetaById, setReportMetaById] = useState<Record<string, ReportMeta>>({});
   const [optimizeStatsUpdatedAt, setOptimizeStatsUpdatedAt] = useState<string>('');
   const [, setDashboardsLoading] = useState(false);
   const [, setDashboardsError] = useState<string | null>(null);
@@ -158,13 +258,21 @@ export const DashboardPage: React.FC = () => {
         const definitionsResponse = await api.optimize.exportDashboardDefinitions(ids);
         const definitions = Array.isArray(definitionsResponse.data) ? definitionsResponse.data : [];
         
-        // Create a map of report ID to report data
+        // Build report meta from exported definitions
         const reportMap = new Map<string, OptimizeDashboard>();
+        const metaById: Record<string, ReportMeta> = {};
         definitions.forEach((entry) => {
           if (entry && typeof entry.id === 'string' && entry.exportEntityType === 'single_process_report') {
             reportMap.set(entry.id, entry);
+            const chartType = detectChartTypeFromDefinition(entry as unknown as Record<string, unknown>);
+            metaById[entry.id] = {
+              id: entry.id,
+              name: entry.name || `Report ${entry.id}`,
+              chartType,
+            };
           }
         });
+        setReportMetaById(metaById);
 
         // Collect all unique report IDs from all dashboards
         const allReportIds = new Set<string>();
@@ -249,14 +357,29 @@ export const DashboardPage: React.FC = () => {
         .map((report) => {
           const reportId = report.id as string;
           const payload = reportDataById[reportId];
-          const pieSlices = extractPieSlices(payload);
+          const chartType = reportMetaById[reportId]?.chartType || 'unknown';
 
-          if (pieSlices) {
+          if (chartType === 'heatmap' || isHeatmapPayload(payload)) {
+            return null;
+          }
+
+          const slices = extractCategoricalSlices(payload);
+
+          if (slices && chartType === 'bar') {
+            return {
+              id: reportId,
+              name: report.name || 'Unnamed Report',
+              kind: 'bar' as const,
+              slices,
+            };
+          }
+
+          if (slices && (chartType === 'pie' || chartType === 'unknown')) {
             return {
               id: reportId,
               name: report.name || 'Unnamed Report',
               kind: 'pie' as const,
-              slices: pieSlices,
+              slices,
             };
           }
 
@@ -270,11 +393,12 @@ export const DashboardPage: React.FC = () => {
             kind: 'metric' as const,
             value: Number.isFinite(value) ? value : 0,
           };
-        });
+        })
+        .filter((report): report is OptimizeReportView => Boolean(report));
     }
 
     return [] as OptimizeReportView[];
-  }, [dashboardIds, dashboardMetaById, reportDataById]);
+  }, [dashboardIds, dashboardMetaById, reportDataById, reportMetaById]);
 
   const supportCaseMetrics = useMemo(
     () => optimizeReports.filter((report): report is Extract<OptimizeReportView, { kind: 'metric' }> => report.kind === 'metric'),
@@ -283,6 +407,11 @@ export const DashboardPage: React.FC = () => {
 
   const optimizePieReports = useMemo(
     () => optimizeReports.filter((report): report is Extract<OptimizeReportView, { kind: 'pie' }> => report.kind === 'pie'),
+    [optimizeReports],
+  );
+
+  const optimizeBarReports = useMemo(
+    () => optimizeReports.filter((report): report is Extract<OptimizeReportView, { kind: 'bar' }> => report.kind === 'bar'),
     [optimizeReports],
   );
 
@@ -492,7 +621,7 @@ export const DashboardPage: React.FC = () => {
               <MetricGridSkeleton count={4} />
               <p className="text-xs text-muted-foreground mt-3 animate-pulse">Loading metrics...</p>
             </>
-          ) : optimizePieReports.length > 0 || supportCaseMetrics.length > 0 ? (
+          ) : optimizePieReports.length > 0 || optimizeBarReports.length > 0 || supportCaseMetrics.length > 0 ? (
             <>
               {optimizePieReports.length > 0 ? (
                 <div className="grid gap-3 lg:grid-cols-3">
@@ -501,6 +630,19 @@ export const DashboardPage: React.FC = () => {
                       key={report.id}
                       title={report.name}
                       subtitle="Optimize pie report"
+                      slices={report.slices}
+                    />
+                  ))}
+                </div>
+              ) : null}
+
+              {optimizeBarReports.length > 0 ? (
+                <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                  {optimizeBarReports.map((report) => (
+                    <BarMetricCard
+                      key={report.id}
+                      title={report.name}
+                      subtitle="Optimize bar report"
                       slices={report.slices}
                     />
                   ))}
