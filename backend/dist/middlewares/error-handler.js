@@ -5,11 +5,23 @@ function notFoundHandler(req, res, _next) {
         method: req.method,
     });
 }
-function errorHandler(err, _req, res, _next) {
+function errorHandler(err, req, res, _next) {
     const upstreamStatus = getUpstreamStatus(err);
     const message = err instanceof Error ? err.message : "Unexpected server error";
     const target = getUpstreamTarget(err);
     const isOptimizeTarget = typeof target === "string" && target.includes("optimize.camunda.io");
+    const isCamundaTarget = typeof target === "string" &&
+        (target.includes("operate.camunda.io") ||
+            target.includes("optimize.camunda.io") ||
+            target.includes("tasklist.camunda.io") ||
+            target.includes("zeebe.camunda.io"));
+    const isDemoRoute = req.originalUrl.startsWith("/api/demo");
+    if (isPrismaAuthError(err) || isPrismaConnectionError(err)) {
+        return apiError(res, 503, "Database is temporarily unavailable", {
+            code: "DATABASE_UNAVAILABLE",
+            hint: "Ensure local Postgres is running and DATABASE_URL in backend/.env is valid.",
+        });
+    }
     if (upstreamStatus === 503) {
         return apiError(res, 503, "Camunda Operate is temporarily unavailable", {
             code: "CAMUNDA_OPERATE_UNAVAILABLE",
@@ -17,11 +29,17 @@ function errorHandler(err, _req, res, _next) {
             hint: "Retry shortly. If persistent, check Camunda Operate health and credentials.",
         });
     }
-    if (isConnectionRefusedError(err)) {
+    if (isConnectionRefusedError(err) && isCamundaTarget) {
         return apiError(res, 502, "Unable to connect to Camunda Operate", {
             code: "CAMUNDA_OPERATE_UNREACHABLE",
             hint: "Verify CAMUNDA_OPERATE_BASE_URL and OAuth/client credentials in backend/.env",
             target: err.url,
+        });
+    }
+    if (isConnectionRefusedError(err) && isDemoRoute) {
+        return apiError(res, 503, "Database is temporarily unavailable", {
+            code: "DATABASE_UNAVAILABLE",
+            hint: "Ensure local Postgres container is up and reachable on localhost:5432.",
         });
     }
     if ((upstreamStatus === 401 || upstreamStatus === 403) && isOptimizeTarget) {
@@ -96,6 +114,25 @@ function isConnectionRefusedError(err) {
     }
     const candidate = err;
     return candidate.code === "ECONNREFUSED";
+}
+function isPrismaAuthError(err) {
+    if (!err || typeof err !== "object") {
+        return false;
+    }
+    const candidate = err;
+    const message = typeof candidate.message === "string" ? candidate.message : "";
+    return (candidate.code === "P1000" ||
+        message.includes("Authentication failed against database server"));
+}
+function isPrismaConnectionError(err) {
+    if (!err || typeof err !== "object") {
+        return false;
+    }
+    const candidate = err;
+    const message = typeof candidate.message === "string" ? candidate.message : "";
+    return (candidate.code === "P1001" ||
+        message.includes("Can't reach database server") ||
+        message.includes("database server"));
 }
 export { notFoundHandler, errorHandler };
 //# sourceMappingURL=error-handler.js.map

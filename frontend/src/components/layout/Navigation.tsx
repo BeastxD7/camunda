@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Search, Sun, Moon, Zap, List, ClipboardList, CircleUserRound, Database, RefreshCw } from 'lucide-react';
+import { Search, Sun, Moon, Zap, List, ClipboardList, CircleUserRound, Database, RefreshCw, Contact } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTheme } from '../theme-provider';
 
@@ -66,6 +66,7 @@ export const Navigation: React.FC = () => {
     { path: '/', label: 'Dashboard', icon: Zap },
     { path: '/processes', label: 'All Processes', icon: List },
     { path: '/tasks', label: 'Tasks', icon: ClipboardList },
+    { path: '/customers', label: 'Customers', icon: Contact },
   ];
 
   return (

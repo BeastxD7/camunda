@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw, AlertCircle, CheckCircle2, Clock3, ExternalLink } from 'lucide-react';
+import { RefreshCw, AlertCircle, CheckCircle2, Clock3, ExternalLink, Maximize2 } from 'lucide-react';
 import { api, type OptimizeDashboard } from '../lib/api';
 import type { ProcessInstance } from '../types/support';
 import { PageContainer } from '../components/layout/PageContainer';
@@ -8,6 +8,14 @@ import { StatsGrid } from '../components/support/stats';
 import { ProcessTable } from '../components/process/ProcessTable';
 import { isDurationMetricName, formatDuration } from '../lib/support-formatters';
 import { MetricGridSkeleton, StatsGridSkeleton, ProcessTableSkeleton } from '../components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '../components/ui/dialog';
 
 const DonutMetricCard = lazy(() =>
   import('../components/support/DonutMetricCard').then((module) => ({
@@ -25,6 +33,7 @@ const DEFAULT_COLLECTION_ID =
   import.meta.env.VITE_OPTIMIZE_COLLECTION_ID || '44d4a885-b01c-42ef-8d3b-1cd43bc695eb';
 const DEFAULT_SUPPORT_BPMN_PROCESS_ID =
   import.meta.env.VITE_SUPPORT_BPMN_PROCESS_ID || 'Process_15wz3ez';
+const HEATMAP_IMAGE_URL = import.meta.env.VITE_HEATMAP_IMAGE_URL || '/heatmap.png';
 
 const PIE_PALETTE = ['#06b6d4', '#34d399', '#3b82f6', '#f59e0b', '#f43f5e', '#8b5cf6', '#64748b'];
 
@@ -623,6 +632,58 @@ export const DashboardPage: React.FC = () => {
             </>
           ) : optimizePieReports.length > 0 || optimizeBarReports.length > 0 || supportCaseMetrics.length > 0 ? (
             <>
+              <section className="mb-3 overflow-hidden rounded-2xl border border-border/70 bg-background shadow-sm">
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
+                  <div>
+                    <h3 className="text-sm font-semibold tracking-tight text-foreground">Customer support automation flow</h3>
+                    <p className="text-xs text-muted-foreground">Heatmap image</p>
+                  </div>
+
+                  {HEATMAP_IMAGE_URL ? (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-2 rounded-lg border border-border/70 bg-background px-3 py-1.5 text-xs font-medium text-foreground transition hover:border-border hover:bg-muted/40"
+                        >
+                          <Maximize2 className="h-3.5 w-3.5" />
+                          Fullscreen
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="h-[96vh] max-w-[96vw] overflow-hidden p-0 sm:max-w-[96vw]">
+                        <div className="flex h-full flex-col bg-background">
+                          <DialogHeader className="border-b border-border/60 px-5 py-4 text-left">
+                            <DialogTitle>Customer support automation flow</DialogTitle>
+                            <DialogDescription>Fullscreen heatmap image preview</DialogDescription>
+                          </DialogHeader>
+                          <div className="min-h-0 flex-1 bg-neutral-50 p-3 dark:bg-neutral-950">
+                            <img
+                              src={HEATMAP_IMAGE_URL}
+                              alt="Customer support automation flow heatmap fullscreen"
+                              className="h-full w-full rounded-xl object-contain"
+                            />
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  ) : null}
+                </div>
+
+                <div className="bg-white p-2">
+                  {HEATMAP_IMAGE_URL ? (
+                    <img
+                      src={HEATMAP_IMAGE_URL}
+                      alt="Customer support automation flow heatmap"
+                      className="h-auto w-full rounded-xl object-contain"
+                    />
+                  ) : (
+                    <div className="flex min-h-[320px] items-center justify-center rounded-xl border border-dashed border-border/60 bg-muted/20 px-4 py-10 text-center text-sm text-muted-foreground">
+                      Place the uploaded image at frontend/public/heatmap.png, or set VITE_HEATMAP_IMAGE_URL to a custom URL.
+                    </div>
+                  )}
+                </div>
+              </section>
+
               {optimizePieReports.length > 0 ? (
                 <div className="grid gap-3 lg:grid-cols-3">
                   {optimizePieReports.map((report) => (

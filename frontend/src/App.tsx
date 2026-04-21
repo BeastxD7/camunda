@@ -5,6 +5,8 @@ import { ProcessList } from './pages/ProcessList';
 import { ProcessDetail } from './pages/ProcessDetail';
 import { ProcessToolTrace } from './pages/ProcessToolTrace';
 import { TasklistPage } from './pages/Tasklist';
+import { CustomerDataPage } from './pages/CustomerData';
+import { CustomerTransactionsPage } from './pages/CustomerTransactions';
 
 /**
  * Main App component with routing configuration
@@ -18,6 +20,8 @@ export function App() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/processes" element={<ProcessList />} />
           <Route path="/tasks" element={<TasklistPage />} />
+          <Route path="/customers" element={<CustomerDataPage />} />
+          <Route path="/customers/:email/transactions" element={<CustomerTransactionsPage />} />
           <Route path="/process/:instanceKey" element={<ProcessDetail />} />
           <Route path="/process/:instanceKey/tools" element={<ProcessToolTrace />} />
         </Routes>

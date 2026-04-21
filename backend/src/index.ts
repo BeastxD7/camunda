@@ -8,6 +8,7 @@ import { processInstanceRoutes } from "./routes/process-instance.routes.js";
 import { optimizeRoutes } from "./routes/optimize.routes.js";
 import { tasklistRoutes } from "./routes/tasklist.routes.js";
 import { demoRoutes } from "./routes/demo.routes.js";
+import { bankRoutes } from "./routes/bank.routes.js";
 import { errorHandler, notFoundHandler } from "./middlewares/error-handler.js";
 import { apiSuccess } from "./utils/api-response.js";
 import { swaggerSpec } from "./docs/swagger.js";
@@ -49,6 +50,7 @@ app.use("/api/process-instances", processInstanceRoutes);
 app.use("/api/optimize", optimizeRoutes);
 app.use("/api/tasklist", tasklistRoutes);
 app.use("/api/demo", demoRoutes);
+app.use("/api/bank", bankRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

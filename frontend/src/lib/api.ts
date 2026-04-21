@@ -78,6 +78,104 @@ interface DemoSyncPayload {
   optimize: { dashboardsSynced: number; reportsSynced: number };
 }
 
+interface BankTableSummary {
+  tableSchema: string;
+  tableName: string;
+  rowCountEstimate: number;
+  columnCount: number;
+  hasPrimaryKey: boolean;
+}
+
+interface BankCustomer {
+  id: number;
+  createdAt: string | null;
+  customerName: string | null;
+  email: string | null;
+  mobile: string | null;
+  age: number | null;
+  income: number | null;
+  residency: string | null;
+  creditScore: number | null;
+}
+
+interface BankCustomersPayload {
+  limit: number;
+  offset: number;
+  totalCount: number;
+  items: BankCustomer[];
+}
+
+interface BankCard {
+  id: number;
+  createdAt: string | null;
+  customerName: string | null;
+  email: string | null;
+  cardName: string | null;
+  annualSpend: number | null;
+  latePayments: number | null;
+  tenure: number | null;
+}
+
+interface BankCardsPayload {
+  email: string;
+  limit: number;
+  offset: number;
+  totalCount: number;
+  items: BankCard[];
+}
+
+interface BankTransaction {
+  transactionId: string;
+  email: string | null;
+  amount: number | null;
+  merchantName: string | null;
+  internalStatus: string | null;
+  createdAt: string | null;
+  raw: Record<string, unknown>;
+}
+
+interface BankTransactionsPayload {
+  email: string;
+  limit: number;
+  offset: number;
+  totalCount: number;
+  items: BankTransaction[];
+}
+
+interface ScreeningMember {
+  id: string;
+  fullName: string | null;
+  email: string | null;
+  mobile: string | null;
+  status: string | null;
+  raw: Record<string, unknown>;
+}
+
+interface ScreeningMembersPayload {
+  limit: number;
+  offset: number;
+  totalCount: number;
+  items: ScreeningMember[];
+}
+
+interface ScreeningActivityLog {
+  id: string;
+  memberId: string | null;
+  fullName: string | null;
+  actionType: string | null;
+  description: string | null;
+  createdAt: string | null;
+  raw: Record<string, unknown>;
+}
+
+interface ScreeningActivityLogsPayload {
+  memberId: string;
+  limit: number;
+  offset: number;
+  totalCount: number;
+  items: ScreeningActivityLog[];
+}
+
 const api = {
   support: {
     listProcessInstances: (params?: { size?: number; bpmnProcessId?: string }) => {
@@ -154,7 +252,62 @@ const api = {
         body: JSON.stringify({ collectionId }),
       }),
   },
+  bank: {
+    getTables: () => request<BankTableSummary[]>('/api/bank/tables'),
+    getCustomers: (params?: { search?: string; limit?: number; offset?: number }) => {
+      const query = new URLSearchParams()
+      if (params?.search) query.set('search', params.search)
+      if (typeof params?.limit === 'number') query.set('limit', String(params.limit))
+      if (typeof params?.offset === 'number') query.set('offset', String(params.offset))
+      const suffix = query.toString() ? `?${query.toString()}` : ''
+      return request<BankCustomersPayload>(`/api/bank/customers${suffix}`)
+    },
+    getCustomerCards: (email: string, params?: { limit?: number; offset?: number }) => {
+      const query = new URLSearchParams()
+      if (typeof params?.limit === 'number') query.set('limit', String(params.limit))
+      if (typeof params?.offset === 'number') query.set('offset', String(params.offset))
+      const suffix = query.toString() ? `?${query.toString()}` : ''
+      return request<BankCardsPayload>(`/api/bank/customers/${encodeURIComponent(email)}/cards${suffix}`)
+    },
+    getCustomerTransactions: (email: string, params?: { limit?: number; offset?: number }) => {
+      const query = new URLSearchParams()
+      if (typeof params?.limit === 'number') query.set('limit', String(params.limit))
+      if (typeof params?.offset === 'number') query.set('offset', String(params.offset))
+      const suffix = query.toString() ? `?${query.toString()}` : ''
+      return request<BankTransactionsPayload>(`/api/bank/customers/${encodeURIComponent(email)}/transactions${suffix}`)
+    },
+    getScreeningMembers: (params?: { search?: string; limit?: number; offset?: number }) => {
+      const query = new URLSearchParams()
+      if (params?.search) query.set('search', params.search)
+      if (typeof params?.limit === 'number') query.set('limit', String(params.limit))
+      if (typeof params?.offset === 'number') query.set('offset', String(params.offset))
+      const suffix = query.toString() ? `?${query.toString()}` : ''
+      return request<ScreeningMembersPayload>(`/api/bank/screening-members${suffix}`)
+    },
+    getScreeningActivity: (memberId: string, params?: { limit?: number; offset?: number }) => {
+      const query = new URLSearchParams()
+      if (typeof params?.limit === 'number') query.set('limit', String(params.limit))
+      if (typeof params?.offset === 'number') query.set('offset', String(params.offset))
+      const suffix = query.toString() ? `?${query.toString()}` : ''
+      return request<ScreeningActivityLogsPayload>(`/api/bank/screening-members/${encodeURIComponent(memberId)}/activity${suffix}`)
+    },
+  },
 }
 
 export { api }
-export type { OptimizeDashboard, OptimizeReport, OptimizeEntityId }
+export type {
+  OptimizeDashboard,
+  OptimizeReport,
+  OptimizeEntityId,
+  BankTableSummary,
+  BankCustomer,
+  BankCustomersPayload,
+  BankCard,
+  BankCardsPayload,
+  BankTransaction,
+  BankTransactionsPayload,
+  ScreeningMember,
+  ScreeningMembersPayload,
+  ScreeningActivityLog,
+  ScreeningActivityLogsPayload,
+}

@@ -86,10 +86,23 @@ async function getReportIds(collectionId) {
 }
 async function exportDashboardDefinitions(dashboardIds) {
     if ((await getDataSourceMode()) === "db") {
-        const rows = await prisma.optimizeDashboardSnapshot.findMany({
+        const dashboardRows = await prisma.optimizeDashboardSnapshot.findMany({
             where: { dashboardId: { in: dashboardIds } },
         });
-        return rows.map((row) => row.dashboardData);
+        const reportRows = await prisma.optimizeReportSnapshot.findMany({
+            where: { collectionId: { in: dashboardRows.map((row) => row.collectionId) } },
+            select: { reportId: true, name: true, description: true },
+        });
+        const reportDefinitions = reportRows.map((row) => ({
+            id: row.reportId,
+            exportEntityType: "single_process_report",
+            name: row.name,
+            description: row.description,
+        }));
+        return [
+            ...dashboardRows.map((row) => row.dashboardData),
+            ...reportDefinitions,
+        ];
     }
     const optimizeBaseUrl = getRequiredEnv("CAMUNDA_OPTIMIZE_BASE_URL").replace(/\/$/, "");
     const token = await getOptimizeAccessToken();
