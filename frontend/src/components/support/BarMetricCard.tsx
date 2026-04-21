@@ -14,6 +14,7 @@ type BarMetricCardProps = {
   title: string
   subtitle?: string
   slices: BarSlice[]
+  valueFormatter?: (value: number) => string
 }
 
 function compactLabel(label: string) {
@@ -21,7 +22,10 @@ function compactLabel(label: string) {
   return `${label.slice(0, 16)}...`
 }
 
-export function BarMetricCard({ title, subtitle, slices }: BarMetricCardProps) {
+export function BarMetricCard({ title, subtitle, slices, valueFormatter }: BarMetricCardProps) {
+  const formatValue = (value: number) =>
+    typeof valueFormatter === 'function' ? valueFormatter(value) : value.toLocaleString()
+
   const chartConfig = useMemo(
     () =>
       slices.reduce<ChartConfig>((acc, slice) => {
@@ -57,10 +61,16 @@ export function BarMetricCard({ title, subtitle, slices }: BarMetricCardProps) {
                     fontSize={11}
                     tickFormatter={(value) => compactLabel(String(value || ''))}
                   />
-                  <YAxis tickLine={false} axisLine={false} fontSize={11} width={42} />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    fontSize={11}
+                    width={70}
+                    tickFormatter={(value) => formatValue(Number(value))}
+                  />
                   <ChartTooltip
                     cursor={false}
-                    content={<ChartTooltipContent formatter={(value) => Number(value).toLocaleString()} />}
+                    content={<ChartTooltipContent formatter={(value) => formatValue(Number(value))} />}
                   />
                   <Bar dataKey="value" radius={[6, 6, 0, 0]}>
                     {slices.map((slice) => (
@@ -74,7 +84,7 @@ export function BarMetricCard({ title, subtitle, slices }: BarMetricCardProps) {
             <div className="flex flex-wrap gap-1.5">
               {slices.map((slice) => (
                 <Badge key={slice.label} variant="outline" className="text-[10px]">
-                  {slice.label}: {slice.value}
+                  {slice.label}: {formatValue(slice.value)}
                 </Badge>
               ))}
             </div>

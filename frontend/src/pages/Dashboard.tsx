@@ -60,9 +60,88 @@ type ReportMeta = {
   chartType: OptimizeChartType;
 };
 
+type MetricValueResolution = {
+  value: number;
+  source: string;
+  rawValue: unknown;
+  usedFallback: boolean;
+};
+
 function toFiniteNumber(value: unknown): number | null {
   const numeric = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(numeric) ? numeric : null;
+}
+
+function formatIsoLikeDateLabel(label: string): string {
+  const trimmed = label.trim();
+  const isoLike = /^\d{4}-\d{2}-\d{2}(?:[T\s].*)?$/.test(trimmed);
+
+  if (!isoLike) {
+    return label;
+  }
+
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) {
+    return label;
+  }
+
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const year = String(date.getUTCFullYear());
+  return `${day}/${month}/${year}`;
+}
+
+function describePayloadShape(payload: unknown): string {
+  if (payload === null) return 'null';
+  if (payload === undefined) return 'undefined';
+  if (Array.isArray(payload)) return `array(${payload.length})`;
+  if (typeof payload === 'object') {
+    return `object(${Object.keys(payload as Record<string, unknown>).length} keys)`;
+  }
+
+  return typeof payload;
+}
+
+function resolveMetricValue(payload: unknown): MetricValueResolution {
+  const candidates: Array<{ source: string; value: unknown }> = [
+    { source: 'payload', value: payload },
+  ];
+
+  if (payload && typeof payload === 'object') {
+    const record = payload as Record<string, unknown>;
+    candidates.push(
+      { source: 'payload.data', value: record.data },
+      { source: 'payload.value', value: record.value },
+      { source: 'payload.result', value: record.result },
+    );
+
+    if (record.result && typeof record.result === 'object') {
+      const nested = record.result as Record<string, unknown>;
+      candidates.push(
+        { source: 'payload.result.value', value: nested.value },
+        { source: 'payload.result.data', value: nested.data },
+      );
+    }
+  }
+
+  for (const candidate of candidates) {
+    const parsed = toFiniteNumber(candidate.value);
+    if (parsed !== null) {
+      return {
+        value: parsed,
+        source: candidate.source,
+        rawValue: candidate.value,
+        usedFallback: false,
+      };
+    }
+  }
+
+  return {
+    value: 0,
+    source: 'fallback(0)',
+    rawValue: payload,
+    usedFallback: true,
+  };
 }
 
 function detectChartTypeFromDefinition(definition: Record<string, unknown>): OptimizeChartType {
@@ -101,7 +180,7 @@ function detectChartTypeFromDefinition(definition: Record<string, unknown>): Opt
   return 'unknown';
 }
 
-function extractCategoricalSlices(payload: unknown): DonutSlice[] | null {
+function extractCategoricalSlices(payload: unknown, minimumPoints = 2): DonutSlice[] | null {
   const candidateArrays: unknown[] = [];
 
   if (Array.isArray(payload)) {
@@ -133,7 +212,8 @@ function extractCategoricalSlices(payload: unknown): DonutSlice[] | null {
         const row = item as Record<string, unknown>;
         const labelRaw = row.label ?? row.name ?? row.group ?? row.key ?? row.category;
         const valueRaw = row.value ?? row.count ?? row.data ?? row.amount;
-        const label = typeof labelRaw === 'string' ? labelRaw.trim() : '';
+        const label =
+          typeof labelRaw === 'string' ? formatIsoLikeDateLabel(labelRaw.trim()) : '';
         const value = toFiniteNumber(valueRaw);
 
         if (!label || value === null || value < 0) {
@@ -148,7 +228,7 @@ function extractCategoricalSlices(payload: unknown): DonutSlice[] | null {
       })
       .filter((slice): slice is DonutSlice => Boolean(slice));
 
-    if (slices.length >= 2 && slices.some((slice) => slice.value > 0)) {
+    if (slices.length >= minimumPoints && slices.some((slice) => slice.value > 0)) {
       return slices;
     }
   }
@@ -376,7 +456,7 @@ export const DashboardPage: React.FC = () => {
             return null;
           }
 
-          const slices = extractCategoricalSlices(payload);
+          const slices = extractCategoricalSlices(payload, chartType === 'bar' ? 1 : 2);
 
           if (slices && chartType === 'bar') {
             return {
@@ -396,15 +476,13 @@ export const DashboardPage: React.FC = () => {
             };
           }
 
-          const rawValue =
-            (payload && typeof payload === 'object' ? (payload as Record<string, unknown>).data : payload) ?? 0;
-          const value = typeof rawValue === 'number' ? rawValue : Number(rawValue ?? 0);
+          const resolution = resolveMetricValue(payload);
 
           return {
             id: reportId,
             name: report.name || 'Unnamed Report',
             kind: 'metric' as const,
-            value: Number.isFinite(value) ? value : 0,
+            value: resolution.value,
           };
         })
         .filter((report): report is OptimizeReportView => Boolean(report));
@@ -427,6 +505,30 @@ export const DashboardPage: React.FC = () => {
     () => optimizeReports.filter((report): report is Extract<OptimizeReportView, { kind: 'bar' }> => report.kind === 'bar'),
     [optimizeReports],
   );
+
+  const metricDebugRows = useMemo(() => {
+    return supportCaseMetrics.map((metric) => {
+      const payload = reportDataById[metric.id];
+      const resolution = resolveMetricValue(payload);
+      const rawPreview =
+        resolution.rawValue === null || resolution.rawValue === undefined
+          ? String(resolution.rawValue)
+          : typeof resolution.rawValue === 'object'
+          ? JSON.stringify(resolution.rawValue).slice(0, 140)
+          : String(resolution.rawValue);
+
+      return {
+        id: metric.id,
+        name: metric.name,
+        chartType: reportMetaById[metric.id]?.chartType || 'unknown',
+        value: metric.value,
+        source: resolution.source,
+        fallback: resolution.usedFallback,
+        payloadShape: describePayloadShape(payload),
+        rawPreview,
+      };
+    });
+  }, [supportCaseMetrics, reportDataById, reportMetaById]);
 
   const stats = useMemo(() => {
     const active = processes.filter((p) => p.state === 'ACTIVE').length;
@@ -708,14 +810,20 @@ export const DashboardPage: React.FC = () => {
 
               {optimizeBarReports.length > 0 ? (
                 <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                  {optimizeBarReports.map((report) => (
+                  {optimizeBarReports.map((report) => {
+                    const isDuration = isDurationMetricName(report.name)
+                    return (
                     <BarMetricCard
                       key={report.id}
                       title={report.name}
                       subtitle="Optimize bar report"
                       slices={report.slices}
+                      valueFormatter={(value) =>
+                        isDuration ? formatDuration(value) : value.toLocaleString()
+                      }
                     />
-                  ))}
+                    )
+                  })}
                 </div>
               ) : null}
 
@@ -743,6 +851,46 @@ export const DashboardPage: React.FC = () => {
               <p className="text-xs text-muted-foreground mt-3">
                 Last updated: {optimizeStatsUpdatedAt ? new Date(optimizeStatsUpdatedAt).toLocaleString() : 'Loading...'}
               </p>
+
+              {metricDebugRows.length > 0 ? (
+                <details className="mt-3 rounded-lg border border-border/60 bg-muted/10 p-3">
+                  <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    Metric Value Debug
+                  </summary>
+                  <div className="mt-3 overflow-auto">
+                    <table className="w-full min-w-[920px] text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-border/60 text-muted-foreground">
+                          <th className="px-2 py-2 font-semibold">Name</th>
+                          <th className="px-2 py-2 font-semibold">Report ID</th>
+                          <th className="px-2 py-2 font-semibold">Chart Type</th>
+                          <th className="px-2 py-2 font-semibold">Rendered Value</th>
+                          <th className="px-2 py-2 font-semibold">Source</th>
+                          <th className="px-2 py-2 font-semibold">Fallback</th>
+                          <th className="px-2 py-2 font-semibold">Payload Shape</th>
+                          <th className="px-2 py-2 font-semibold">Raw Preview</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {metricDebugRows.map((row) => (
+                          <tr key={row.id} className="border-b border-border/40 align-top">
+                            <td className="px-2 py-2 text-foreground">{row.name}</td>
+                            <td className="px-2 py-2 text-muted-foreground">{row.id}</td>
+                            <td className="px-2 py-2 text-muted-foreground">{row.chartType}</td>
+                            <td className="px-2 py-2 text-foreground">{row.value}</td>
+                            <td className="px-2 py-2 text-muted-foreground">{row.source}</td>
+                            <td className="px-2 py-2 text-muted-foreground">{row.fallback ? 'yes' : 'no'}</td>
+                            <td className="px-2 py-2 text-muted-foreground">{row.payloadShape}</td>
+                            <td className="max-w-[280px] truncate px-2 py-2 text-muted-foreground" title={row.rawPreview}>
+                              {row.rawPreview}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
+              ) : null}
             </>
           ) : (
             <div className="rounded-lg border border-dashed border-border/60 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
