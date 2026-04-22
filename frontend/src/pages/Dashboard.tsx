@@ -738,62 +738,7 @@ export const DashboardPage: React.FC = () => {
             </>
           ) : optimizePieReports.length > 0 || optimizeBarReports.length > 0 || supportCaseMetrics.length > 0 ? (
             <>
-              <section className="mb-3 overflow-hidden rounded-2xl border border-border/70 bg-background shadow-sm">
-                <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
-                  <div>
-                    <h3 className="text-sm font-semibold tracking-tight text-foreground">Customer support automation flow</h3>
-                    <p className="text-xs text-muted-foreground">Heatmap image set</p>
-                  </div>
-                </div>
-
-                <div className="grid gap-3 bg-white p-2 lg:grid-cols-2">
-                  {HEATMAP_IMAGES.map((heatmap, index) => (
-                    <figure
-                      key={heatmap.src}
-                      className={`overflow-hidden rounded-xl border border-border/60 bg-background shadow-sm ${
-                        index === 0 ? 'lg:col-span-2' : ''
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                          {heatmap.label}
-                        </span>
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <button
-                              type="button"
-                              className="inline-flex items-center gap-1 rounded-md border border-border/70 bg-background px-2 py-1 text-[11px] font-medium text-foreground transition hover:border-border hover:bg-muted/40"
-                            >
-                              <Maximize2 className="h-3.5 w-3.5" />
-                              Fullscreen
-                            </button>
-                          </DialogTrigger>
-                          <DialogContent className="h-[96vh] max-w-[96vw] overflow-hidden p-0 sm:max-w-[96vw]">
-                            <div className="flex h-full flex-col bg-background">
-                              <DialogHeader className="border-b border-border/60 px-5 py-4 text-left">
-                                <DialogTitle>{heatmap.label}</DialogTitle>
-                                <DialogDescription>Fullscreen heatmap image preview</DialogDescription>
-                              </DialogHeader>
-                              <div className="min-h-0 flex-1 overflow-auto bg-neutral-50 p-4 dark:bg-neutral-950">
-                                <img
-                                  src={heatmap.src}
-                                  alt={`${heatmap.label} fullscreen preview`}
-                                  className="h-full w-full rounded-xl object-contain"
-                                />
-                              </div>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-                      <img
-                        src={heatmap.src}
-                        alt={`Customer support automation flow ${heatmap.label.toLowerCase()}`}
-                        className={`${index === 0 ? 'max-h-[520px]' : 'max-h-[320px]'} h-full w-full object-contain`}
-                      />
-                    </figure>
-                  ))}
-                </div>
-              </section>
+              
 
               {optimizePieReports.length > 0 ? (
                 <div className="grid gap-3 lg:grid-cols-3">
@@ -852,7 +797,7 @@ export const DashboardPage: React.FC = () => {
                 Last updated: {optimizeStatsUpdatedAt ? new Date(optimizeStatsUpdatedAt).toLocaleString() : 'Loading...'}
               </p>
 
-              {metricDebugRows.length > 0 ? (
+              {/* {metricDebugRows.length > 0 ? (
                 <details className="mt-3 rounded-lg border border-border/60 bg-muted/10 p-3">
                   <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                     Metric Value Debug
@@ -890,7 +835,7 @@ export const DashboardPage: React.FC = () => {
                     </table>
                   </div>
                 </details>
-              ) : null}
+              ) : null} */}
             </>
           ) : (
             <div className="rounded-lg border border-dashed border-border/60 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
@@ -898,6 +843,63 @@ export const DashboardPage: React.FC = () => {
             </div>
           )}
         </section>
+
+        <section className="mb-3 overflow-hidden rounded-2xl border border-border/70 bg-background shadow-sm">
+                <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
+                  <div>
+                    <h3 className="text-sm font-semibold tracking-tight text-foreground">Customer support automation flow</h3>
+                    <p className="text-xs text-muted-foreground">Heatmap image set</p>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 bg-white p-2 lg:grid-cols-2">
+                  {HEATMAP_IMAGES.map((heatmap, index) => (
+                    <figure
+                      key={heatmap.src}
+                      className={`overflow-hidden rounded-xl border border-border/60 bg-background shadow-sm ${
+                        index === 0 ? 'lg:col-span-2' : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-2">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          {heatmap.label}
+                        </span>
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1 rounded-md border border-border/70 bg-background px-2 py-1 text-[11px] font-medium text-foreground transition hover:border-border hover:bg-muted/40"
+                            >
+                              <Maximize2 className="h-3.5 w-3.5" />
+                              Fullscreen
+                            </button>
+                          </DialogTrigger>
+                          <DialogContent className="h-[96vh] max-w-[96vw] overflow-hidden p-0 sm:max-w-[96vw]">
+                            <div className="flex h-full flex-col bg-background">
+                              <DialogHeader className="border-b border-border/60 px-5 py-4 text-left">
+                                <DialogTitle>{heatmap.label}</DialogTitle>
+                                <DialogDescription>Fullscreen heatmap image preview</DialogDescription>
+                              </DialogHeader>
+                              <div className="min-h-0 flex-1 overflow-auto bg-neutral-50 p-4 dark:bg-neutral-950">
+                                <img
+                                  src={heatmap.src}
+                                  alt={`${heatmap.label} fullscreen preview`}
+                                  className="h-full w-full rounded-xl object-contain"
+                                />
+                              </div>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                      <img
+                        src={heatmap.src}
+                        alt={`Customer support automation flow ${heatmap.label.toLowerCase()}`}
+                        className={`${index === 0 ? 'max-h-[520px]' : 'max-h-[320px]'} h-full w-full object-contain`}
+                      />
+                    </figure>
+                  ))}
+                </div>
+              </section>
 
         <section className="border border-border/70 bg-background p-5">
           <div className="flex items-center justify-between mb-4">
