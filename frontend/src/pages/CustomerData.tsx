@@ -101,35 +101,35 @@ const PaginationControls: React.FC<PaginationControlsProps> = ({
   )
 }
 
-function riskTagFromScore(score: unknown) {
-  const normalizedScore = toFiniteNumber(score)
+// function riskTagFromScore(score: unknown) {
+//   const normalizedScore = toFiniteNumber(score)
 
-  if (normalizedScore === null) {
-    return {
-      label: "Unknown",
-      tone: "border-border/70 bg-muted/30 text-muted-foreground",
-    }
-  }
+//   if (normalizedScore === null) {
+//     return {
+//       label: "Unknown",
+//       tone: "border-border/70 bg-muted/30 text-muted-foreground",
+//     }
+//   }
 
-  if (normalizedScore < 580) {
-    return {
-      label: "High Risk",
-      tone: "border-destructive/40 bg-destructive/10 text-destructive",
-    }
-  }
+//   if (normalizedScore < 580) {
+//     return {
+//       label: "High Risk",
+//       tone: "border-destructive/40 bg-destructive/10 text-destructive",
+//     }
+//   }
 
-  if (normalizedScore < 700) {
-    return {
-      label: "Watch",
-      tone: "border-amber-500/40 bg-amber-500/10 text-amber-700",
-    }
-  }
+//   if (normalizedScore < 700) {
+//     return {
+//       label: "Watch",
+//       tone: "border-amber-500/40 bg-amber-500/10 text-amber-700",
+//     }
+//   }
 
-  return {
-    label: "Healthy",
-    tone: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700",
-  }
-}
+//   return {
+//     label: "Healthy",
+//     tone: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700",
+//   }
+// }
 
 function statusTone(status: string | null | undefined) {
   const normalized = (status || "").toLowerCase()
@@ -188,10 +188,10 @@ export const CustomerDataPage: React.FC = () => {
     [customers, selectedCustomerEmail]
   )
 
-  const riskTag = useMemo(
-    () => riskTagFromScore(selectedCustomer?.creditScore),
-    [selectedCustomer?.creditScore]
-  )
+  // const riskTag = useMemo(
+  //   () => riskTagFromScore(selectedCustomer?.creditScore),
+  //   [selectedCustomer?.creditScore]
+  // )
 
   const totalCardSpend = useMemo(
     () =>
@@ -470,7 +470,7 @@ export const CustomerDataPage: React.FC = () => {
                 {customers.map((customer) => {
                   const email = customer.email || ""
                   const selected = email === selectedCustomerEmail
-                  const thisRisk = riskTagFromScore(customer.creditScore)
+                  // const thisRisk = riskTagFromScore(customer.creditScore)
 
                   return (
                     <button
@@ -487,11 +487,11 @@ export const CustomerDataPage: React.FC = () => {
                         <p className="text-sm font-semibold text-foreground">
                           {customer.customerName || "Unnamed customer"}
                         </p>
-                        <span
+                        {/* <span
                           className={`rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${thisRisk.tone}`}
                         >
                           {thisRisk.label}
-                        </span>
+                        </span> */}
                       </div>
                       <p className="mt-1 truncate text-xs text-muted-foreground">
                         {customer.email || "No email"}
@@ -527,11 +527,11 @@ export const CustomerDataPage: React.FC = () => {
                       {selectedCustomer?.customerName || "No customer selected"}
                     </h3>
                   </div>
-                  <span
+                  {/* <span
                     className={`rounded-lg border px-2.5 py-1 text-xs font-semibold ${riskTag.tone}`}
                   >
                     {riskTag.label}
-                  </span>
+                  </span> */}
                 </div>
 
                 <div className="mt-4 grid gap-3 md:grid-cols-3">
