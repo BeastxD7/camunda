@@ -1,19 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import {
-  ArrowRightLeft,
-  CreditCard,
-  Mail,
-  Phone,
-  Search,
-} from 'lucide-react'
-import { PageContainer } from '../components/layout/PageContainer'
+import React, { useEffect, useMemo, useState } from "react"
+import { Link } from "react-router-dom"
+import { ArrowRightLeft, CreditCard, Mail, Phone, Search } from "lucide-react"
+import { PageContainer } from "../components/layout/PageContainer"
 import {
   api,
   type BankCard,
   type BankCustomer,
   type BankTransaction,
-} from '../lib/api'
+} from "../lib/api"
 
 const CUSTOMER_PAGE_SIZE = 10
 const MEMBER_PAGE_SIZE = 8
@@ -21,11 +15,11 @@ const DETAIL_PAGE_SIZE = 8
 const CUSTOMER_POLL_INTERVAL_MS = 10000
 
 function toFiniteNumber(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) {
+  if (typeof value === "number" && Number.isFinite(value)) {
     return value
   }
 
-  if (typeof value === 'string' && value.trim()) {
+  if (typeof value === "string" && value.trim()) {
     const parsed = Number(value)
     if (Number.isFinite(parsed)) {
       return parsed
@@ -37,16 +31,16 @@ function toFiniteNumber(value: unknown): number | null {
 
 function formatNumber(value: unknown) {
   const parsed = toFiniteNumber(value)
-  if (parsed === null) return 'N/A'
+  if (parsed === null) return "N/A"
   return parsed.toLocaleString()
 }
 
 function formatCurrency(value: unknown) {
   const parsed = toFiniteNumber(value)
-  if (parsed === null) return 'N/A'
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
+  if (parsed === null) return "N/A"
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
     maximumFractionDigits: 0,
   }).format(parsed)
 }
@@ -58,7 +52,7 @@ function clampOffset(offset: number, totalCount: number, pageSize: number) {
 }
 
 function pageLabel(offset: number, pageSize: number, totalCount: number) {
-  if (totalCount === 0) return '0-0 of 0'
+  if (totalCount === 0) return "0-0 of 0"
   const start = offset + 1
   const end = Math.min(offset + pageSize, totalCount)
   return `${start}-${end} of ${totalCount}`
@@ -111,36 +105,56 @@ function riskTagFromScore(score: unknown) {
   const normalizedScore = toFiniteNumber(score)
 
   if (normalizedScore === null) {
-    return { label: 'Unknown', tone: 'border-border/70 bg-muted/30 text-muted-foreground' }
+    return {
+      label: "Unknown",
+      tone: "border-border/70 bg-muted/30 text-muted-foreground",
+    }
   }
 
   if (normalizedScore < 580) {
-    return { label: 'High Risk', tone: 'border-destructive/40 bg-destructive/10 text-destructive' }
+    return {
+      label: "High Risk",
+      tone: "border-destructive/40 bg-destructive/10 text-destructive",
+    }
   }
 
   if (normalizedScore < 700) {
-    return { label: 'Watch', tone: 'border-amber-500/40 bg-amber-500/10 text-amber-700' }
+    return {
+      label: "Watch",
+      tone: "border-amber-500/40 bg-amber-500/10 text-amber-700",
+    }
   }
 
-  return { label: 'Healthy', tone: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700' }
+  return {
+    label: "Healthy",
+    tone: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700",
+  }
 }
 
 function statusTone(status: string | null | undefined) {
-  const normalized = (status || '').toLowerCase()
+  const normalized = (status || "").toLowerCase()
 
-  if (normalized.includes('declin') || normalized.includes('failed') || normalized.includes('flag')) {
-    return 'border-destructive/40 bg-destructive/10 text-destructive'
+  if (
+    normalized.includes("declin") ||
+    normalized.includes("failed") ||
+    normalized.includes("flag")
+  ) {
+    return "border-destructive/40 bg-destructive/10 text-destructive"
   }
 
-  if (normalized.includes('review') || normalized.includes('pending')) {
-    return 'border-amber-500/40 bg-amber-500/10 text-amber-700'
+  if (normalized.includes("review") || normalized.includes("pending")) {
+    return "border-amber-500/40 bg-amber-500/10 text-amber-700"
   }
 
-  if (normalized.includes('success') || normalized.includes('approved') || normalized.includes('clear')) {
-    return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700'
+  if (
+    normalized.includes("success") ||
+    normalized.includes("approved") ||
+    normalized.includes("clear")
+  ) {
+    return "border-emerald-500/40 bg-emerald-500/10 text-emerald-700"
   }
 
-  return 'border-border/70 bg-muted/30 text-muted-foreground'
+  return "border-border/70 bg-muted/30 text-muted-foreground"
 }
 
 export const CustomerDataPage: React.FC = () => {
@@ -149,11 +163,11 @@ export const CustomerDataPage: React.FC = () => {
   const [pollTick, setPollTick] = useState(0)
 
   const [customers, setCustomers] = useState<BankCustomer[]>([])
-  const [customerSearchInput, setCustomerSearchInput] = useState('')
-  const [customerSearch, setCustomerSearch] = useState('')
+  const [customerSearchInput, setCustomerSearchInput] = useState("")
+  const [customerSearch, setCustomerSearch] = useState("")
   const [customerOffset, setCustomerOffset] = useState(0)
   const [customerTotalCount, setCustomerTotalCount] = useState(0)
-  const [selectedCustomerEmail, setSelectedCustomerEmail] = useState<string>('')
+  const [selectedCustomerEmail, setSelectedCustomerEmail] = useState<string>("")
 
   const [cards, setCards] = useState<BankCard[]>([])
   const [cardsOffset, setCardsOffset] = useState(0)
@@ -163,23 +177,29 @@ export const CustomerDataPage: React.FC = () => {
   const [transactionsOffset, setTransactionsOffset] = useState(0)
   const [transactionsTotalCount, setTransactionsTotalCount] = useState(0)
 
-  const screeningSearch = ''
+  const screeningSearch = ""
   const [screeningOffset, setScreeningOffset] = useState(0)
   const [screeningTotalCount, setScreeningTotalCount] = useState(0)
 
   const selectedCustomer = useMemo(
-    () => customers.find((customer) => customer.email === selectedCustomerEmail) || null,
-    [customers, selectedCustomerEmail],
+    () =>
+      customers.find((customer) => customer.email === selectedCustomerEmail) ||
+      null,
+    [customers, selectedCustomerEmail]
   )
 
   const riskTag = useMemo(
     () => riskTagFromScore(selectedCustomer?.creditScore),
-    [selectedCustomer?.creditScore],
+    [selectedCustomer?.creditScore]
   )
 
   const totalCardSpend = useMemo(
-    () => cards.reduce((sum, card) => sum + (toFiniteNumber(card.annualSpend) || 0), 0),
-    [cards],
+    () =>
+      cards.reduce(
+        (sum, card) => sum + (toFiniteNumber(card.annualSpend) || 0),
+        0
+      ),
+    [cards]
   )
 
   useEffect(() => {
@@ -212,22 +232,29 @@ export const CustomerDataPage: React.FC = () => {
         setCustomers(items)
         setCustomerTotalCount(totalCount)
 
-        const safeOffset = clampOffset(customerOffset, totalCount, CUSTOMER_PAGE_SIZE)
+        const safeOffset = clampOffset(
+          customerOffset,
+          totalCount,
+          CUSTOMER_PAGE_SIZE
+        )
         if (safeOffset !== customerOffset) {
           setCustomerOffset(safeOffset)
           return
         }
 
-        if (!items.some((customer) => customer.email === selectedCustomerEmail)) {
-          const nextEmail = items.find((customer) => customer.email)?.email || ''
+        if (
+          !items.some((customer) => customer.email === selectedCustomerEmail)
+        ) {
+          const nextEmail =
+            items.find((customer) => customer.email)?.email || ""
           setSelectedCustomerEmail(nextEmail)
         }
       } catch {
         if (!mounted) return
         setCustomers([])
         setCustomerTotalCount(0)
-        setSelectedCustomerEmail('')
-        setError('Failed to load customer queue')
+        setSelectedCustomerEmail("")
+        setError("Failed to load customer queue")
       } finally {
         if (mounted) {
           setLoading(false)
@@ -260,7 +287,11 @@ export const CustomerDataPage: React.FC = () => {
 
         setScreeningTotalCount(totalCount)
 
-        const safeOffset = clampOffset(screeningOffset, totalCount, MEMBER_PAGE_SIZE)
+        const safeOffset = clampOffset(
+          screeningOffset,
+          totalCount,
+          MEMBER_PAGE_SIZE
+        )
         if (safeOffset !== screeningOffset) {
           setScreeningOffset(safeOffset)
         }
@@ -321,7 +352,11 @@ export const CustomerDataPage: React.FC = () => {
         setTransactions(nextTransactions)
         setTransactionsTotalCount(nextTransactionsTotal)
 
-        const safeCardsOffset = clampOffset(cardsOffset, nextCardsTotal, DETAIL_PAGE_SIZE)
+        const safeCardsOffset = clampOffset(
+          cardsOffset,
+          nextCardsTotal,
+          DETAIL_PAGE_SIZE
+        )
         if (safeCardsOffset !== cardsOffset) {
           setCardsOffset(safeCardsOffset)
         }
@@ -329,7 +364,7 @@ export const CustomerDataPage: React.FC = () => {
         const safeTransactionsOffset = clampOffset(
           transactionsOffset,
           nextTransactionsTotal,
-          DETAIL_PAGE_SIZE,
+          DETAIL_PAGE_SIZE
         )
         if (safeTransactionsOffset !== transactionsOffset) {
           setTransactionsOffset(safeTransactionsOffset)
@@ -355,30 +390,30 @@ export const CustomerDataPage: React.FC = () => {
       <div className="relative flex flex-col gap-5 overflow-hidden">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(60%_120%_at_18%_0%,color-mix(in_srgb,var(--primary)_18%,transparent),transparent)]" />
         <section className="support-header relative overflow-hidden rounded-3xl border border-border/70 bg-card/90 p-6">
-          <div className="absolute -right-10 -top-10 h-44 w-44 rounded-full bg-primary/10 blur-3xl" />
-          <div className="absolute -left-8 bottom-0 h-20 w-40 rotate-3 rounded-full bg-accent/20 blur-2xl" />
+          <div className="absolute -top-10 -right-10 h-44 w-44 rounded-full bg-primary/10 blur-3xl" />
+          <div className="absolute bottom-0 -left-8 h-20 w-40 rotate-3 rounded-full bg-accent/20 blur-2xl" />
 
           <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Support Desk</p>
-              <h1 className="mt-2 text-3xl font-heading font-bold tracking-tight text-foreground">
+              <p className="text-xs tracking-[0.2em] text-muted-foreground uppercase">
+                Support Desk
+              </p>
+              <h1 className="mt-2 font-heading text-3xl font-bold tracking-tight text-foreground">
                 Customer Operations Console
               </h1>
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                Triage customer issues, review payments, inspect card behavior, and validate screening
-                activity from one workflow-focused workspace.
+                Triage customer issues, review payments, inspect card behavior,
+                and validate screening activity from one workflow-focused
+                workspace.
               </p>
             </div>
 
-            <div className="grid min-w-[220px] grid-cols-2 gap-2 text-xs">
-              <div className="rounded-xl border border-border/60 bg-background/80 p-3">
-                <p className="text-muted-foreground">Queue Size</p>
-                <p className="mt-1 text-lg font-semibold text-foreground">{formatNumber(customerTotalCount)}</p>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-background/80 p-3">
-                <p className="text-muted-foreground">Screening Profiles</p>
-                <p className="mt-1 text-lg font-semibold text-foreground">{formatNumber(screeningTotalCount)}</p>
-              </div>
+            {/* <div className="grid min-w-[220px] grid-cols-2 gap-2 text-xs"> */}
+            <div className="rounded-xl border border-border/60 bg-background/80 p-3">
+              <p className="text-muted-foreground">Queue Size</p>
+              <p className="mt-1 text-lg font-semibold text-foreground">
+                {formatNumber(customerTotalCount)}
+              </p>
             </div>
           </div>
         </section>
@@ -395,7 +430,7 @@ export const CustomerDataPage: React.FC = () => {
           <section className="grid gap-4 xl:grid-cols-[300px_1fr_1fr]">
             <aside className="support-card rounded-2xl border border-border/70 bg-card p-4 xl:sticky xl:top-5 xl:h-[calc(100vh-10rem)] xl:overflow-hidden">
               <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                <h2 className="text-sm font-semibold tracking-[0.14em] text-muted-foreground uppercase">
                   Active Queue
                 </h2>
                 <span className="rounded-md bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary">
@@ -407,9 +442,11 @@ export const CustomerDataPage: React.FC = () => {
                 <Search className="h-4 w-4 text-muted-foreground" />
                 <input
                   value={customerSearchInput}
-                  onChange={(event) => setCustomerSearchInput(event.target.value)}
+                  onChange={(event) =>
+                    setCustomerSearchInput(event.target.value)
+                  }
                   onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
+                    if (event.key === "Enter") {
                       setCustomerOffset(0)
                       setCustomerSearch(customerSearchInput.trim())
                     }
@@ -431,7 +468,7 @@ export const CustomerDataPage: React.FC = () => {
 
               <div className="space-y-2 xl:max-h-[calc(100vh-20rem)] xl:overflow-auto xl:pr-1">
                 {customers.map((customer) => {
-                  const email = customer.email || ''
+                  const email = customer.email || ""
                   const selected = email === selectedCustomerEmail
                   const thisRisk = riskTagFromScore(customer.creditScore)
 
@@ -442,13 +479,13 @@ export const CustomerDataPage: React.FC = () => {
                       onClick={() => setSelectedCustomerEmail(email)}
                       className={`w-full rounded-xl border p-3 text-left transition ${
                         selected
-                          ? 'border-primary/70 bg-primary/10 shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_30%,transparent)]'
-                          : 'border-border/60 bg-background hover:border-primary/40 hover:bg-muted/20'
+                          ? "border-primary/70 bg-primary/10 shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_30%,transparent)]"
+                          : "border-border/60 bg-background hover:border-primary/40 hover:bg-muted/20"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-sm font-semibold text-foreground">
-                          {customer.customerName || 'Unnamed customer'}
+                          {customer.customerName || "Unnamed customer"}
                         </p>
                         <span
                           className={`rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${thisRisk.tone}`}
@@ -456,7 +493,9 @@ export const CustomerDataPage: React.FC = () => {
                           {thisRisk.label}
                         </span>
                       </div>
-                      <p className="mt-1 truncate text-xs text-muted-foreground">{customer.email || 'No email'}</p>
+                      <p className="mt-1 truncate text-xs text-muted-foreground">
+                        {customer.email || "No email"}
+                      </p>
                     </button>
                   )
                 })}
@@ -466,8 +505,14 @@ export const CustomerDataPage: React.FC = () => {
                 offset={customerOffset}
                 pageSize={CUSTOMER_PAGE_SIZE}
                 totalCount={customerTotalCount}
-                onPrevious={() => setCustomerOffset((prev) => Math.max(prev - CUSTOMER_PAGE_SIZE, 0))}
-                onNext={() => setCustomerOffset((prev) => prev + CUSTOMER_PAGE_SIZE)}
+                onPrevious={() =>
+                  setCustomerOffset((prev) =>
+                    Math.max(prev - CUSTOMER_PAGE_SIZE, 0)
+                  )
+                }
+                onNext={() =>
+                  setCustomerOffset((prev) => prev + CUSTOMER_PAGE_SIZE)
+                }
               />
             </aside>
 
@@ -475,12 +520,16 @@ export const CustomerDataPage: React.FC = () => {
               <article className="support-card rounded-2xl border border-border/70 bg-card p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Customer 360</p>
-                    <h3 className="mt-1 text-2xl font-heading font-bold text-foreground">
-                      {selectedCustomer?.customerName || 'No customer selected'}
+                    <p className="text-xs tracking-[0.16em] text-muted-foreground uppercase">
+                      Customer 360
+                    </p>
+                    <h3 className="mt-1 font-heading text-2xl font-bold text-foreground">
+                      {selectedCustomer?.customerName || "No customer selected"}
                     </h3>
                   </div>
-                  <span className={`rounded-lg border px-2.5 py-1 text-xs font-semibold ${riskTag.tone}`}>
+                  <span
+                    className={`rounded-lg border px-2.5 py-1 text-xs font-semibold ${riskTag.tone}`}
+                  >
                     {riskTag.label}
                   </span>
                 </div>
@@ -500,21 +549,26 @@ export const CustomerDataPage: React.FC = () => {
                   </div>
                   <div className="rounded-xl border border-border/60 bg-muted/20 p-3 text-xs">
                     <p className="text-muted-foreground">Card Spend (Page)</p>
-                    <p className="mt-1 text-xl font-semibold text-foreground">{formatCurrency(totalCardSpend)}</p>
+                    <p className="mt-1 text-xl font-semibold text-foreground">
+                      {formatCurrency(totalCardSpend)}
+                    </p>
                   </div>
                 </div>
 
                 <div className="mt-4 grid gap-2 rounded-xl border border-border/60 bg-background p-3 text-sm">
                   <p className="flex items-center gap-2 text-muted-foreground">
                     <Mail className="h-4 w-4" />
-                    {selectedCustomer?.email || 'No email'}
+                    {selectedCustomer?.email || "No email"}
                   </p>
                   <p className="flex items-center gap-2 text-muted-foreground">
                     <Phone className="h-4 w-4" />
-                    {selectedCustomer?.mobile || 'No mobile number'}
+                    {selectedCustomer?.mobile || "No mobile number"}
                   </p>
                   <p className="text-muted-foreground">
-                    Residency: <span className="text-foreground">{selectedCustomer?.residency || 'N/A'}</span>
+                    Residency:{" "}
+                    <span className="text-foreground">
+                      {selectedCustomer?.residency || "N/A"}
+                    </span>
                   </p>
                 </div>
               </article>
@@ -522,21 +576,25 @@ export const CustomerDataPage: React.FC = () => {
               <article className="support-card rounded-2xl border border-border/70 bg-card p-5">
                 <div className="mb-3 flex items-center gap-2">
                   <CreditCard className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  <h3 className="text-sm font-semibold tracking-[0.14em] text-muted-foreground uppercase">
                     Card Portfolio
                   </h3>
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-2">
                   {cards.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No cards found for this customer.</p>
+                    <p className="text-sm text-muted-foreground">
+                      No cards found for this customer.
+                    </p>
                   ) : (
                     cards.map((card) => (
                       <div
                         key={card.id}
                         className="rounded-xl border border-border/60 bg-[linear-gradient(145deg,color-mix(in_srgb,var(--primary)_10%,transparent),transparent)] p-3"
                       >
-                        <p className="text-sm font-semibold text-foreground">{card.cardName || 'Card Product'}</p>
+                        <p className="text-sm font-semibold text-foreground">
+                          {card.cardName || "Card Product"}
+                        </p>
                         <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                           <p className="text-muted-foreground">Annual Spend</p>
                           <p className="text-right font-medium text-foreground">
@@ -547,7 +605,9 @@ export const CustomerDataPage: React.FC = () => {
                             {formatNumber(card.latePayments)}
                           </p>
                           <p className="text-muted-foreground">Tenure</p>
-                          <p className="text-right font-medium text-foreground">{formatNumber(card.tenure)}</p>
+                          <p className="text-right font-medium text-foreground">
+                            {formatNumber(card.tenure)}
+                          </p>
                         </div>
                       </div>
                     ))
@@ -558,8 +618,14 @@ export const CustomerDataPage: React.FC = () => {
                   offset={cardsOffset}
                   pageSize={DETAIL_PAGE_SIZE}
                   totalCount={cardsTotalCount}
-                  onPrevious={() => setCardsOffset((prev) => Math.max(prev - DETAIL_PAGE_SIZE, 0))}
-                  onNext={() => setCardsOffset((prev) => prev + DETAIL_PAGE_SIZE)}
+                  onPrevious={() =>
+                    setCardsOffset((prev) =>
+                      Math.max(prev - DETAIL_PAGE_SIZE, 0)
+                    )
+                  }
+                  onNext={() =>
+                    setCardsOffset((prev) => prev + DETAIL_PAGE_SIZE)
+                  }
                 />
               </article>
             </div>
@@ -569,7 +635,7 @@ export const CustomerDataPage: React.FC = () => {
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <ArrowRightLeft className="h-4 w-4 text-primary" />
-                    <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    <h3 className="text-sm font-semibold tracking-[0.14em] text-muted-foreground uppercase">
                       Recent Transactions
                     </h3>
                   </div>
@@ -585,10 +651,12 @@ export const CustomerDataPage: React.FC = () => {
 
                 <div className="max-h-[340px] space-y-2 overflow-auto pr-1">
                   {transactions.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No transactions found for this customer.</p>
+                    <p className="text-sm text-muted-foreground">
+                      No transactions found for this customer.
+                    </p>
                   ) : (
                     transactions.map((transaction) => {
-                      const txStatus = transaction.internalStatus || 'Unknown'
+                      const txStatus = transaction.internalStatus || "Unknown"
 
                       return (
                         <div
@@ -598,15 +666,20 @@ export const CustomerDataPage: React.FC = () => {
                           <div className="flex items-start justify-between gap-2">
                             <div>
                               <p className="text-sm font-semibold text-foreground">
-                                {transaction.merchantName || 'Merchant unavailable'}
+                                {transaction.merchantName ||
+                                  "Merchant unavailable"}
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 {transaction.createdAt
-                                  ? new Date(transaction.createdAt).toLocaleString()
-                                  : 'Unknown timestamp'}
+                                  ? new Date(
+                                      transaction.createdAt
+                                    ).toLocaleString()
+                                  : "Unknown timestamp"}
                               </p>
                             </div>
-                            <span className={`rounded-md border px-1.5 py-0.5 text-[10px] ${statusTone(txStatus)}`}>
+                            <span
+                              className={`rounded-md border px-1.5 py-0.5 text-[10px] ${statusTone(txStatus)}`}
+                            >
                               {txStatus}
                             </span>
                           </div>
@@ -624,9 +697,13 @@ export const CustomerDataPage: React.FC = () => {
                   pageSize={DETAIL_PAGE_SIZE}
                   totalCount={transactionsTotalCount}
                   onPrevious={() =>
-                    setTransactionsOffset((prev) => Math.max(prev - DETAIL_PAGE_SIZE, 0))
+                    setTransactionsOffset((prev) =>
+                      Math.max(prev - DETAIL_PAGE_SIZE, 0)
+                    )
                   }
-                  onNext={() => setTransactionsOffset((prev) => prev + DETAIL_PAGE_SIZE)}
+                  onNext={() =>
+                    setTransactionsOffset((prev) => prev + DETAIL_PAGE_SIZE)
+                  }
                 />
               </article>
 
