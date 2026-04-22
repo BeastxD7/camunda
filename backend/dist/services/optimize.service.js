@@ -88,20 +88,46 @@ async function exportDashboardDefinitions(dashboardIds) {
     if ((await getDataSourceMode()) === "db") {
         const dashboardRows = await prisma.optimizeDashboardSnapshot.findMany({
             where: { dashboardId: { in: dashboardIds } },
+            select: { dashboardData: true, reportsData: true, collectionId: true },
         });
         const reportRows = await prisma.optimizeReportSnapshot.findMany({
             where: { collectionId: { in: dashboardRows.map((row) => row.collectionId) } },
             select: { reportId: true, name: true, description: true },
         });
-        const reportDefinitions = reportRows.map((row) => ({
-            id: row.reportId,
-            exportEntityType: "single_process_report",
-            name: row.name,
-            description: row.description,
-        }));
+        const reportDefinitionsFromDashboards = dashboardRows.flatMap((row) => {
+            const reportsData = row.reportsData;
+            if (!reportsData || typeof reportsData !== "object" || Array.isArray(reportsData)) {
+                return [];
+            }
+            const candidate = reportsData.reportDefinitions;
+            if (!Array.isArray(candidate)) {
+                return [];
+            }
+            return candidate.filter((item) => Boolean(item && typeof item === "object"));
+        });
+        const reportDefinitionById = new Map();
+        for (const definition of reportDefinitionsFromDashboards) {
+            const id = typeof definition.id === "string" ? definition.id : "";
+            if (!id)
+                continue;
+            reportDefinitionById.set(id, {
+                ...definition,
+                exportEntityType: "single_process_report",
+            });
+        }
+        for (const row of reportRows) {
+            if (!reportDefinitionById.has(row.reportId)) {
+                reportDefinitionById.set(row.reportId, {
+                    id: row.reportId,
+                    exportEntityType: "single_process_report",
+                    name: row.name,
+                    description: row.description,
+                });
+            }
+        }
         return [
             ...dashboardRows.map((row) => row.dashboardData),
-            ...reportDefinitions,
+            ...Array.from(reportDefinitionById.values()),
         ];
     }
     const optimizeBaseUrl = getRequiredEnv("CAMUNDA_OPTIMIZE_BASE_URL").replace(/\/$/, "");

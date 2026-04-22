@@ -225,6 +225,47 @@ function extractCategoricalSlices(payload: unknown, minimumPoints = 2): DonutSli
   return null;
 }
 
+function inferChartKindForUnknownReport(
+  payload: unknown,
+  slices: DonutSlice[],
+  reportName: string,
+): 'pie' | 'bar' {
+  if (isDurationMetricName(reportName)) {
+    return 'bar';
+  }
+
+  if (payload && typeof payload === 'object') {
+    const data = (payload as Record<string, unknown>).data;
+    if (Array.isArray(data) && data.length > 0) {
+      const rows = data.filter((item): item is Record<string, unknown> =>
+        Boolean(item && typeof item === 'object'),
+      );
+
+      const hasKeyValueRows =
+        rows.length > 0 &&
+        rows.every(
+          (row) =>
+            typeof row.key === 'string' &&
+            (typeof row.value === 'number' || typeof row.value === 'string'),
+        );
+
+      const hasDateLikeKeys = rows.some(
+        (row) => typeof row.key === 'string' && /^\d{4}-\d{2}-\d{2}(?:[T\s].*)?$/.test(row.key),
+      );
+
+      if (hasDateLikeKeys || (hasKeyValueRows && rows.length === 1)) {
+        return 'bar';
+      }
+    }
+  }
+
+  if (slices.length === 1) {
+    return 'bar';
+  }
+
+  return 'pie';
+}
+
 function isHeatmapPayload(payload: unknown): boolean {
   const candidateArrays: unknown[] = [];
 
@@ -456,11 +497,26 @@ export const DashboardPage: React.FC = () => {
             };
           }
 
-          if (slices && (chartType === 'pie' || chartType === 'unknown')) {
+          if (slices && chartType === 'pie') {
             return {
               id: reportId,
               name: report.name || 'Unnamed Report',
               kind: 'pie' as const,
+              slices,
+            };
+          }
+
+          if (slices && chartType === 'unknown') {
+            const inferredKind = inferChartKindForUnknownReport(
+              payload,
+              slices,
+              report.name || 'Unnamed Report',
+            );
+
+            return {
+              id: reportId,
+              name: report.name || 'Unnamed Report',
+              kind: inferredKind,
               slices,
             };
           }

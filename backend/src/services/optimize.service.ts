@@ -123,22 +123,54 @@ async function exportDashboardDefinitions(dashboardIds: string[]) {
 	if ((await getDataSourceMode()) === "db") {
 		const dashboardRows = await prisma.optimizeDashboardSnapshot.findMany({
 			where: { dashboardId: { in: dashboardIds } },
+			select: { dashboardData: true, reportsData: true, collectionId: true },
 		});
 		const reportRows = await prisma.optimizeReportSnapshot.findMany({
 			where: { collectionId: { in: dashboardRows.map((row) => row.collectionId) } },
 			select: { reportId: true, name: true, description: true },
 		});
 
-		const reportDefinitions = reportRows.map((row: { reportId: string; name: string | null; description: string | null }) => ({
-			id: row.reportId,
-			exportEntityType: "single_process_report",
-			name: row.name,
-			description: row.description,
-		}));
+		const reportDefinitionsFromDashboards = dashboardRows.flatMap((row) => {
+			const reportsData = row.reportsData;
+			if (!reportsData || typeof reportsData !== "object" || Array.isArray(reportsData)) {
+				return [] as Array<Record<string, unknown>>;
+			}
+
+			const candidate = (reportsData as { reportDefinitions?: unknown }).reportDefinitions;
+			if (!Array.isArray(candidate)) {
+				return [] as Array<Record<string, unknown>>;
+			}
+
+			return candidate.filter(
+				(item): item is Record<string, unknown> => Boolean(item && typeof item === "object"),
+			);
+		});
+
+		const reportDefinitionById = new Map<string, Record<string, unknown>>();
+
+		for (const definition of reportDefinitionsFromDashboards) {
+			const id = typeof definition.id === "string" ? definition.id : "";
+			if (!id) continue;
+			reportDefinitionById.set(id, {
+				...definition,
+				exportEntityType: "single_process_report",
+			});
+		}
+
+		for (const row of reportRows) {
+			if (!reportDefinitionById.has(row.reportId)) {
+				reportDefinitionById.set(row.reportId, {
+					id: row.reportId,
+					exportEntityType: "single_process_report",
+					name: row.name,
+					description: row.description,
+				});
+			}
+		}
 
 		return [
-			...dashboardRows.map((row: { dashboardData: unknown }) => row.dashboardData),
-			...reportDefinitions,
+			...dashboardRows.map((row) => row.dashboardData),
+			...Array.from(reportDefinitionById.values()),
 		];
 	}
 

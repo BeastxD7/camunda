@@ -183,9 +183,17 @@ async function syncOptimize(collectionId: string) {
 	for (const dashboard of dashboardDefinitions.filter((item) => item && item.exportEntityType === "dashboard")) {
 		const dashboardId = String(dashboard.id || "");
 		if (!dashboardId) continue;
-		const reportMap = Array.isArray((dashboard as { tiles?: Array<{ id?: string }> }).tiles)
+		const reportIdsForDashboard = Array.isArray((dashboard as { tiles?: Array<{ id?: string }> }).tiles)
 			? (dashboard as { tiles?: Array<{ id?: string }> }).tiles!.map((tile) => String(tile.id || "")).filter(Boolean)
 			: [];
+		const reportDefinitionsForDashboard = reportIdsForDashboard
+			.map((reportId) => reportDefinitionById.get(reportId))
+			.filter((definition): definition is Record<string, unknown> => Boolean(definition));
+
+		const reportsDataPayload = {
+			reportIds: reportIdsForDashboard,
+			reportDefinitions: reportDefinitionsForDashboard,
+		};
 
 		await prisma.optimizeDashboardSnapshot.upsert({
 			where: { sourceKey: dashboardId },
@@ -197,7 +205,7 @@ async function syncOptimize(collectionId: string) {
 				description: typeof dashboard.description === "string" ? dashboard.description : null,
 				dashboardId,
 				dashboardData: dashboard as Prisma.InputJsonValue,
-				reportsData: reportMap as Prisma.InputJsonValue,
+				reportsData: reportsDataPayload as Prisma.InputJsonValue,
 			},
 			update: {
 				collectionId,
@@ -205,7 +213,7 @@ async function syncOptimize(collectionId: string) {
 				description: typeof dashboard.description === "string" ? dashboard.description : null,
 				dashboardId,
 				dashboardData: dashboard as Prisma.InputJsonValue,
-				reportsData: reportMap as Prisma.InputJsonValue,
+				reportsData: reportsDataPayload as Prisma.InputJsonValue,
 			},
 		});
 		dashboardsSynced += 1;
