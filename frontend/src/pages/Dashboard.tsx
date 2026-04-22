@@ -91,17 +91,6 @@ function formatIsoLikeDateLabel(label: string): string {
   return `${day}/${month}/${year}`;
 }
 
-function describePayloadShape(payload: unknown): string {
-  if (payload === null) return 'null';
-  if (payload === undefined) return 'undefined';
-  if (Array.isArray(payload)) return `array(${payload.length})`;
-  if (typeof payload === 'object') {
-    return `object(${Object.keys(payload as Record<string, unknown>).length} keys)`;
-  }
-
-  return typeof payload;
-}
-
 function resolveMetricValue(payload: unknown): MetricValueResolution {
   const candidates: Array<{ source: string; value: unknown }> = [
     { source: 'payload', value: payload },
@@ -506,30 +495,6 @@ export const DashboardPage: React.FC = () => {
     [optimizeReports],
   );
 
-  const metricDebugRows = useMemo(() => {
-    return supportCaseMetrics.map((metric) => {
-      const payload = reportDataById[metric.id];
-      const resolution = resolveMetricValue(payload);
-      const rawPreview =
-        resolution.rawValue === null || resolution.rawValue === undefined
-          ? String(resolution.rawValue)
-          : typeof resolution.rawValue === 'object'
-          ? JSON.stringify(resolution.rawValue).slice(0, 140)
-          : String(resolution.rawValue);
-
-      return {
-        id: metric.id,
-        name: metric.name,
-        chartType: reportMetaById[metric.id]?.chartType || 'unknown',
-        value: metric.value,
-        source: resolution.source,
-        fallback: resolution.usedFallback,
-        payloadShape: describePayloadShape(payload),
-        rawPreview,
-      };
-    });
-  }, [supportCaseMetrics, reportDataById, reportMetaById]);
-
   const stats = useMemo(() => {
     const active = processes.filter((p) => p.state === 'ACTIVE').length;
     const completed = processes.filter((p) => p.state === 'COMPLETED').length;
@@ -903,7 +868,7 @@ export const DashboardPage: React.FC = () => {
 
         <section className="border border-border/70 bg-background p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Recent Cases</h2>
+            <h2 className="text-xl font-semibold">Recent Enquiries</h2>
             <button
               onClick={() => navigate('/processes')}
               className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors"

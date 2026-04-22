@@ -6,8 +6,6 @@ import {
   Mail,
   Phone,
   Search,
-  ShieldAlert,
-  Users,
 } from 'lucide-react'
 import { PageContainer } from '../components/layout/PageContainer'
 import {
@@ -15,13 +13,12 @@ import {
   type BankCard,
   type BankCustomer,
   type BankTransaction,
-  type ScreeningActivityLog,
-  type ScreeningMember,
 } from '../lib/api'
 
 const CUSTOMER_PAGE_SIZE = 10
 const MEMBER_PAGE_SIZE = 8
 const DETAIL_PAGE_SIZE = 8
+const CUSTOMER_POLL_INTERVAL_MS = 10000
 
 function toFiniteNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -149,6 +146,7 @@ function statusTone(status: string | null | undefined) {
 export const CustomerDataPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [pollTick, setPollTick] = useState(0)
 
   const [customers, setCustomers] = useState<BankCustomer[]>([])
   const [customerSearchInput, setCustomerSearchInput] = useState('')
@@ -165,23 +163,13 @@ export const CustomerDataPage: React.FC = () => {
   const [transactionsOffset, setTransactionsOffset] = useState(0)
   const [transactionsTotalCount, setTransactionsTotalCount] = useState(0)
 
-  const [screeningMembers, setScreeningMembers] = useState<ScreeningMember[]>([])
-  const [screeningSearchInput, setScreeningSearchInput] = useState('')
-  const [screeningSearch, setScreeningSearch] = useState('')
+  const screeningSearch = ''
   const [screeningOffset, setScreeningOffset] = useState(0)
   const [screeningTotalCount, setScreeningTotalCount] = useState(0)
-  const [selectedMemberId, setSelectedMemberId] = useState<string>('')
-
-  const [activityLogs, setActivityLogs] = useState<ScreeningActivityLog[]>([])
 
   const selectedCustomer = useMemo(
     () => customers.find((customer) => customer.email === selectedCustomerEmail) || null,
     [customers, selectedCustomerEmail],
-  )
-
-  const selectedMember = useMemo(
-    () => screeningMembers.find((member) => member.id === selectedMemberId) || null,
-    [screeningMembers, selectedMemberId],
   )
 
   const riskTag = useMemo(
@@ -193,6 +181,16 @@ export const CustomerDataPage: React.FC = () => {
     () => cards.reduce((sum, card) => sum + (toFiniteNumber(card.annualSpend) || 0), 0),
     [cards],
   )
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setPollTick((previous) => previous + 1)
+    }, CUSTOMER_POLL_INTERVAL_MS)
+
+    return () => {
+      window.clearInterval(timer)
+    }
+  }, [])
 
   useEffect(() => {
     let mounted = true
@@ -242,7 +240,7 @@ export const CustomerDataPage: React.FC = () => {
     return () => {
       mounted = false
     }
-  }, [customerSearch, customerOffset, selectedCustomerEmail])
+  }, [customerSearch, customerOffset, selectedCustomerEmail, pollTick])
 
   useEffect(() => {
     let mounted = true
@@ -258,26 +256,17 @@ export const CustomerDataPage: React.FC = () => {
         if (!mounted) return
 
         const payload = response.data
-        const items = payload?.items || []
         const totalCount = payload?.totalCount || 0
 
-        setScreeningMembers(items)
         setScreeningTotalCount(totalCount)
 
         const safeOffset = clampOffset(screeningOffset, totalCount, MEMBER_PAGE_SIZE)
         if (safeOffset !== screeningOffset) {
           setScreeningOffset(safeOffset)
-          return
-        }
-
-        if (!items.some((member) => member.id === selectedMemberId)) {
-          setSelectedMemberId(items[0]?.id || '')
         }
       } catch {
         if (!mounted) return
-        setScreeningMembers([])
         setScreeningTotalCount(0)
-        setSelectedMemberId('')
       }
     }
 
@@ -286,7 +275,7 @@ export const CustomerDataPage: React.FC = () => {
     return () => {
       mounted = false
     }
-  }, [screeningSearch, screeningOffset, selectedMemberId])
+  }, [screeningSearch, screeningOffset, pollTick])
 
   useEffect(() => {
     setCardsOffset(0)
@@ -359,41 +348,7 @@ export const CustomerDataPage: React.FC = () => {
     return () => {
       mounted = false
     }
-  }, [selectedCustomerEmail, cardsOffset, transactionsOffset])
-
-  useEffect(() => {
-    let mounted = true
-
-    async function loadMemberActivityData() {
-      if (!selectedMemberId) {
-        setActivityLogs([])
-        return
-      }
-
-      try {
-        const activityResponse = await api.bank.getScreeningActivity(selectedMemberId, {
-          limit: DETAIL_PAGE_SIZE,
-          offset: 0,
-        })
-
-        if (!mounted) return
-
-        const payload = activityResponse.data
-        const items = payload?.items || []
-
-        setActivityLogs(items)
-      } catch {
-        if (!mounted) return
-        setActivityLogs([])
-      }
-    }
-
-    void loadMemberActivityData()
-
-    return () => {
-      mounted = false
-    }
-  }, [selectedMemberId])
+  }, [selectedCustomerEmail, cardsOffset, transactionsOffset, pollTick])
 
   return (
     <PageContainer>
@@ -675,7 +630,7 @@ export const CustomerDataPage: React.FC = () => {
                 />
               </article>
 
-              <article className="support-card rounded-2xl border border-border/70 bg-card p-5">
+              {/* <article className="support-card rounded-2xl border border-border/70 bg-card p-5">
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <ShieldAlert className="h-4 w-4 text-primary" />
@@ -767,7 +722,7 @@ export const CustomerDataPage: React.FC = () => {
                     onNext={() => setScreeningOffset((prev) => prev + MEMBER_PAGE_SIZE)}
                   />
                 </div>
-              </article>
+              </article> */}
             </div>
           </section>
         )}

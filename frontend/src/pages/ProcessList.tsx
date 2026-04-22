@@ -164,10 +164,10 @@ export const ProcessList: React.FC = () => {
             </button>
             <div className="space-y-1">
               <h1 className="text-2xl font-heading font-semibold tracking-tight text-foreground">
-                All Cases
+                All enquiries
               </h1>
               <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
-                Browse and manage all support cases
+                Browse and manage all support enquiries
               </p>
             </div>
           </div>
