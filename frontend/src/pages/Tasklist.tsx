@@ -208,6 +208,7 @@ export const TasklistPage: React.FC = () => {
 
   const [submitting, setSubmitting] = useState(false)
   const [actionMessage, setActionMessage] = useState<string | null>(null)
+  const [optimisticAssignees, setOptimisticAssignees] = useState<Record<string, string>>({})
 
   React.useEffect(() => {
     if (!toast) return
@@ -225,8 +226,13 @@ export const TasklistPage: React.FC = () => {
   )
 
   const currentAssignee = useMemo(
-    () => toDisplayString(selectedTaskDetails?.task?.assignee || selectedTask?.assignee).trim(),
-    [selectedTaskDetails, selectedTask],
+    () =>
+      toDisplayString(
+        optimisticAssignees[selectedTaskId] ||
+          selectedTaskDetails?.task?.assignee ||
+          selectedTask?.assignee,
+      ).trim(),
+    [optimisticAssignees, selectedTaskDetails, selectedTask, selectedTaskId],
   )
 
   const formComponents = useMemo(() => {
@@ -285,7 +291,17 @@ export const TasklistPage: React.FC = () => {
       })
 
       const items = response.data?.items || []
-      setTasks(items)
+      setTasks(
+        items.map((task) => {
+          const optimisticAssignee = optimisticAssignees[task.id]
+          if (!optimisticAssignee) return task
+
+          return {
+            ...task,
+            assignee: task.assignee || optimisticAssignee,
+          }
+        }),
+      )
 
       if (!selectedTaskId && items.length > 0) {
         setSelectedTaskId(String(items[0].id || ''))
@@ -315,7 +331,20 @@ export const TasklistPage: React.FC = () => {
     try {
       const response = await api.tasklist.getTaskDetails(taskId)
       const details = response.data || null
-      setSelectedTaskDetails(details)
+      setSelectedTaskDetails(() => {
+        if (!details) return details
+
+        const optimisticAssignee = optimisticAssignees[taskId]
+        if (!optimisticAssignee || !details.task) return details
+
+        return {
+          ...details,
+          task: {
+            ...details.task,
+            assignee: details.task.assignee || optimisticAssignee,
+          },
+        }
+      })
 
       const values: Record<string, unknown> = {
         ...(details?.variables || {}),
@@ -365,6 +394,10 @@ export const TasklistPage: React.FC = () => {
 
     setSubmitting(true)
     setActionMessage(null)
+    setOptimisticAssignees((previous) => ({
+      ...previous,
+      [selectedTask.id]: DEFAULT_TASK_ASSIGNEE,
+    }))
 
     try {
       await api.tasklist.assignTask(selectedTask.id, DEFAULT_TASK_ASSIGNEE)
@@ -392,9 +425,11 @@ export const TasklistPage: React.FC = () => {
       })
 
       setActionMessage('Task assigned to you.')
-      void loadTasks(true)
-      void loadTaskDetails(selectedTask.id)
     } catch (err) {
+      setOptimisticAssignees((previous) => {
+        const { [selectedTask.id]: _removed, ...rest } = previous
+        return rest
+      })
       setActionMessage(err instanceof Error ? err.message : 'Failed to assign task')
     } finally {
       setSubmitting(false)
@@ -724,7 +759,7 @@ export const TasklistPage: React.FC = () => {
 
                 <div className="rounded-2xl border border-border/60 bg-muted/20 p-4 space-y-2">
                   <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Customer Details</p>
-                  <p className="text-sm"><span className="text-muted-foreground">Name:</span> {customerSnapshot.customerName}</p>
+                  {/* <p className="text-sm"><span className="text-muted-foreground">Name:</span> {customerSnapshot.customerName}</p> */}
                   <p className="text-sm"><span className="text-muted-foreground">Email:</span> {customerSnapshot.customerEmail}</p>
                   <p className="text-sm"><span className="text-muted-foreground">Subject:</span> {customerSnapshot.emailSubject}</p>
                   <p className="text-sm"><span className="text-muted-foreground">Request:</span> {customerSnapshot.requestDetails}</p>
