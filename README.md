@@ -138,7 +138,23 @@ cd docker
 docker compose -f docker-compose.postgres.yml down -v
 ```
 
-## 9. Branching
+## 9. Heatmap Images
+
+These heatmap assets are available in `frontend/public` and rendered below:
+
+### Customer Support Automation Flow
+
+![Customer support automation flow heatmap](frontend/public/heatmap.png)
+
+### Card Eligibility
+
+![Card eligibility heatmap](frontend/public/heatmap2.png)
+
+### Unknown Transaction
+
+![Unknown transaction heatmap](frontend/public/heatmap3.png)
+
+## 10. Branching
 
 Development branch for DB integration:
 - `camunda-db`
