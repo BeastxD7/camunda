@@ -79,9 +79,9 @@ export const Navigation: React.FC = () => {
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5 rounded-lg blur-md" />
               {/* <span className="relative inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg ring-2 ring-primary/25"> */}
-                {/* <span className="font-bold text-sm">B</span> */}
+              {/* <span className="font-bold text-sm">B</span> */}
               {/* </span> */}
-              <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ-7sXfsQAXFT4k2X_Ox5SX_gDDl8YD9tBKpQ&s" alt="CAMUNDA" className='w-20 rounded-md'/>
+              <img src="PR_Logo.png" alt="PebbleRoad" className='w-20 rounded-md' />
             </div>
 
             {/* Brand Text */}
@@ -104,11 +104,10 @@ export const Navigation: React.FC = () => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-all duration-200 ${
-                    active
-                      ? 'bg-primary text-primary-foreground shadow-md'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-secondary/40'
-                  }`}
+                  className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-all duration-200 ${active
+                    ? 'bg-primary text-primary-foreground shadow-md'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary/40'
+                    }`}
                 >
                   <Icon size={16} className="flex-shrink-0" />
                   <span>{item.label}</span>
@@ -127,7 +126,7 @@ export const Navigation: React.FC = () => {
                 disabled={switching || sourceMode === 'camunda'}
                 className={`rounded-md px-2 py-1 transition-colors ${sourceMode === 'camunda' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
               >
-                Camunda
+                Live
               </button>
               <button
                 type="button"
