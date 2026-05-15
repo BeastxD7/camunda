@@ -797,7 +797,10 @@ export const DashboardPage: React.FC = () => {
                 <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {supportCaseMetrics.map((metric) => {
                     const isDuration = isDurationMetricName(metric.name)
-                    const displayValue = isDuration && typeof metric.value === 'number' 
+                    const isCost = metric.id === '353151c1-de4f-49d0-b5e9-81a1ade053bc'
+                    const displayValue = isCost && typeof metric.value === 'number'
+                      ? `$${metric.value.toFixed(2)}`
+                      : isDuration && typeof metric.value === 'number'
                       ? formatDuration(metric.value)
                       : metric.value
                     
